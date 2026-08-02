@@ -80,6 +80,9 @@ fn transcribe(context: &WhisperContext, audio: &[f32]) -> Result<String, String>
     params.set_print_timestamps(false);
     params.set_suppress_blank(true);
     params.set_n_threads(4);
+    // Senza lingua esplicita Whisper prova a indovinarla su ogni segmento e
+    // sui pezzi brevi sbaglia, producendo inglese o "foreign language".
+    params.set_language(Some("it"));
 
     state
         .full(params, audio)
@@ -101,14 +104,31 @@ fn transcribe(context: &WhisperContext, audio: &[f32]) -> Result<String, String>
 /// Whisper allucina volentieri sul silenzio, restituendo sigle di sottotitoli o
 /// ringraziamenti presi dai video di addestramento.
 fn is_noise(text: &str) -> bool {
-    let cleaned = text
-        .trim()
+    let trimmed = text.trim();
+
+    // Sul silenzio Whisper emette marcatori come [BLANK_AUDIO] o
+    // (speaking in foreign language): sono annotazioni, non parlato.
+    let stripped = trimmed
+        .trim_start_matches(['[', '('])
+        .trim_end_matches([']', ')']);
+    if (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        || (trimmed.starts_with('(') && trimmed.ends_with(')'))
+    {
+        let _ = stripped;
+        return true;
+    }
+
+    let cleaned = trimmed
         .trim_matches(|c: char| !c.is_alphanumeric())
         .to_lowercase();
     if cleaned.chars().count() < 3 {
         return true;
     }
-    const HALLUCINATIONS: [&str; 8] = [
+    const HALLUCINATIONS: [&str; 12] = [
+        "blank_audio",
+        "speaking in foreign language",
+        "silenzio",
+        "musica di sottofondo",
         "sottotitoli e revisione a cura di qtss",
         "sottotitoli creati dalla comunità amara.org",
         "grazie per aver guardato il video",

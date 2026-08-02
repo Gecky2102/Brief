@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Spinner from "./Spinner";
 import {
   KIND_LABELS,
   listSegments,
@@ -180,11 +181,13 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             disabled={analyzing || segments.length === 0}
             className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40"
           >
-            {analyzing
-              ? "Analisi in corso…"
-              : analysis
-                ? "Rigenera analisi"
-                : "Analizza sessione"}
+            {analyzing ? (
+              <Spinner label="Analisi in corso…" />
+            ) : analysis ? (
+              "Rigenera analisi"
+            ) : (
+              "Analizza sessione"
+            )}
           </button>
           <button
             onClick={saveMarkdown}
@@ -224,10 +227,22 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
         )}
 
         {notice && <p className="text-xs text-ink-muted">{notice}</p>}
-        {error && <p className="text-xs leading-relaxed text-red-400">{error}</p>}
+        {error && <p className="rounded-md border border-live/40 bg-live/10 px-3 py-2 text-xs leading-relaxed text-live">{error}</p>}
       </header>
 
       <div className="space-y-8 px-8 py-6">
+        {analyzing && !analysis && (
+          <div className="space-y-3 rounded-xl border border-edge bg-surface-raised/40 p-5">
+            <p className="text-xs text-ink-muted">
+              Il modello legge la trascrizione e prepara riassunto, decisioni e
+              cose da fare. Su registrazioni lunghe può richiedere un minuto.
+            </p>
+            <div className="brief-skeleton h-3 w-full rounded" />
+            <div className="brief-skeleton h-3 w-5/6 rounded" />
+            <div className="brief-skeleton h-3 w-2/3 rounded" />
+          </div>
+        )}
+
         {analysis && (
           <div className="space-y-6 rounded-lg border border-edge bg-surface-raised/40 p-5">
             {analysis.summary && (

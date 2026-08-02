@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Recorder from "./components/Recorder";
 import SessionView from "./components/SessionView";
+import Spinner from "./components/Spinner";
 import {
   deleteSession,
   listSessions,
+  reconcileOrphanSessions,
   searchSessions,
   type Session,
 } from "./lib/db";
@@ -31,6 +33,7 @@ export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -41,7 +44,17 @@ export default function App() {
     load.then(setSessions).catch((cause: unknown) => setError(String(cause)));
   }, [query]);
 
-  useEffect(refresh, [refresh]);
+  // Prima di mostrare qualsiasi cosa si chiudono le sessioni rimaste aperte da
+  // un'uscita brusca, altrimenti restano in lista come "Registrazione in corso".
+  useEffect(() => {
+    reconcileOrphanSessions()
+      .catch(() => undefined)
+      .finally(() => setReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (ready) refresh();
+  }, [ready, refresh]);
 
   const selected = sessions.find((session) => session.id === selectedId) ?? null;
 
@@ -52,6 +65,15 @@ export default function App() {
     await deleteSession(session.id);
     setSelectedId(null);
     refresh();
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3">
+        <Spinner size="md" />
+        <span className="text-xs text-ink-muted">Apertura archivio…</span>
+      </div>
+    );
   }
 
   return (

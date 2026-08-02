@@ -11,15 +11,19 @@ function toWidth(rms: number): number {
 }
 
 export default function LevelMeter({ label, rms, active }: Props) {
+  const width = active ? toWidth(rms) : 0;
   return (
     <div className="flex items-center gap-3">
       <span className="w-24 shrink-0 text-xs text-ink-muted">{label}</span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-raised">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-sunken">
         <div
           className="h-full rounded-full bg-accent transition-[width] duration-75 ease-out"
-          style={{ width: `${active ? toWidth(rms) : 0}%` }}
+          style={{ width: `${width}%` }}
         />
       </div>
+      <span className="w-8 shrink-0 text-right font-mono text-[10px] text-ink-muted">
+        {active ? `${width}` : "—"}
+      </span>
     </div>
   );
 }

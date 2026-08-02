@@ -53,6 +53,21 @@ export async function db(): Promise<Database> {
   return instance;
 }
 
+/// Se l'app viene chiusa mentre registra, la sessione resta senza `ended_at`.
+/// All'avvio o la si chiude con quello che ha, o la si elimina se è vuota.
+export async function reconcileOrphanSessions(): Promise<void> {
+  const conn = await db();
+  await conn.execute(
+    `DELETE FROM sessions WHERE ended_at IS NULL
+     AND id NOT IN (SELECT DISTINCT session_id FROM segments)`,
+  );
+  await conn.execute(
+    `UPDATE sessions SET ended_at = started_at,
+       title = 'Sessione interrotta ' || substr(started_at, 1, 10)
+     WHERE ended_at IS NULL`,
+  );
+}
+
 export async function listSessions(): Promise<Session[]> {
   const conn = await db();
   return conn.select<Session[]>(
