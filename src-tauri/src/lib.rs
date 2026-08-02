@@ -1,3 +1,5 @@
+mod audio;
+
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 fn migrations() -> Vec<Migration> {
@@ -17,6 +19,15 @@ pub fn run() {
                 .add_migrations("sqlite:brief.db", migrations())
                 .build(),
         )
+        .setup(|app| {
+            audio::remember_app_handle(app.handle().clone());
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            audio::start_recording,
+            audio::stop_recording,
+            audio::is_recording
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Recorder from "./components/Recorder";
 import { listSessions, type Session } from "./lib/db";
 
 function formatDuration(ms: number): string {
@@ -12,11 +13,13 @@ export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     listSessions()
       .then(setSessions)
       .catch((cause: unknown) => setError(String(cause)));
   }, []);
+
+  useEffect(refresh, [refresh]);
 
   return (
     <div className="flex h-full">
@@ -46,13 +49,10 @@ export default function App() {
         </nav>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center p-8">
-        {error ? (
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
+        <Recorder onFinished={refresh} />
+        {error && (
           <p className="max-w-md text-center text-sm text-red-400">{error}</p>
-        ) : (
-          <p className="text-sm text-ink-muted">
-            Seleziona una sessione o avvia una registrazione.
-          </p>
         )}
       </main>
     </div>

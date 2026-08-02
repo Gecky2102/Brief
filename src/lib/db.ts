@@ -34,6 +34,28 @@ export async function listSessions(): Promise<Session[]> {
   );
 }
 
+export async function createSession(input: {
+  title: string;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  audioPath: string;
+}): Promise<number> {
+  const conn = await db();
+  const result = await conn.execute(
+    `INSERT INTO sessions (title, kind, started_at, ended_at, duration_ms, audio_path)
+     VALUES ($1, 'unknown', $2, $3, $4, $5)`,
+    [
+      input.title,
+      input.startedAt,
+      input.endedAt,
+      input.durationMs,
+      input.audioPath,
+    ],
+  );
+  return result.lastInsertId ?? 0;
+}
+
 export async function searchSessions(query: string): Promise<Session[]> {
   const conn = await db();
   return conn.select<Session[]>(
