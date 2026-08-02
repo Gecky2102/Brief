@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: oklch(0.62 0.19 258);
+  --color-surface: oklch(0.16 0.005 260);
+  --color-surface-raised: oklch(0.21 0.006 260);
+  --color-edge: oklch(0.3 0.008 260);
+  --color-ink: oklch(0.95 0.003 260);
+  --color-ink-muted: oklch(0.65 0.008 260);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-family:
+    ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
