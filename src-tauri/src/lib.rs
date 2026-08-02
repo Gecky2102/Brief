@@ -1,4 +1,8 @@
+mod analysis;
 mod audio;
+mod export;
+mod models;
+mod transcriber;
 
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -14,6 +18,7 @@ fn migrations() -> Vec<Migration> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations("sqlite:brief.db", migrations())
@@ -26,7 +31,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             audio::start_recording,
             audio::stop_recording,
-            audio::is_recording
+            audio::is_recording,
+            analysis::analyze_session,
+            analysis::models_status,
+            export::compress_recording,
+            export::export_markdown,
+            export::export_audio,
+            export::delete_recording
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

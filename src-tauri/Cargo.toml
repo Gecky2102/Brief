@@ -22,4 +22,10 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
+whisper-rs = { version = "0.16.0", features = ["metal"] }
+llama-cpp-2 = { version = "0.1.153", features = ["metal"] }
+ureq = "3.3.0"
+sha2 = "0.11.0"
+tauri-plugin-dialog = "2.7.2"
+encoding_rs = "0.8.35"
 

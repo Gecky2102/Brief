@@ -8,9 +8,15 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 type LevelCallback = extern "C" fn(track: i32, rms: c_float, elapsed_ms: i64);
+type SamplesCallback =
+    extern "C" fn(track: i32, samples: *const i16, count: std::os::raw::c_int, start_ms: i64);
 
 extern "C" {
-    fn brief_capture_start(directory: *const c_char, callback: LevelCallback) -> i32;
+    fn brief_capture_start(
+        directory: *const c_char,
+        callback: LevelCallback,
+        samples: SamplesCallback,
+    ) -> i32;
     fn brief_capture_stop() -> i64;
     fn brief_capture_is_running() -> i32;
 }
@@ -93,7 +99,7 @@ fn recordings_root(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn start_recording(app: AppHandle) -> Result<StartedRecording, String> {
+pub fn start_recording(app: AppHandle, session_id: i64) -> Result<StartedRecording, String> {
     let started_at_ms = epoch_millis();
     let directory = recordings_root(&app)?.join(started_at_ms.to_string());
     std::fs::create_dir_all(&directory)
@@ -102,8 +108,13 @@ pub fn start_recording(app: AppHandle) -> Result<StartedRecording, String> {
     let path = CString::new(directory.to_string_lossy().as_bytes())
         .map_err(|_| "Percorso della sessione non valido.".to_string())?;
 
-    let code = unsafe { brief_capture_start(path.as_ptr(), on_level) };
+    // Il trascrittore parte per primo: se il modello manca o non si carica è
+    // meglio saperlo prima di aver registrato qualcosa.
+    crate::transcriber::start(&app, session_id)?;
+
+    let code = unsafe { brief_capture_start(path.as_ptr(), on_level, crate::transcriber::on_samples) };
     if code != 0 {
+        crate::transcriber::stop();
         let _ = std::fs::remove_dir_all(&directory);
         return Err(describe(code).to_string());
     }
@@ -119,6 +130,7 @@ pub fn start_recording(app: AppHandle) -> Result<StartedRecording, String> {
 #[tauri::command]
 pub fn stop_recording() -> Result<FinishedRecording, String> {
     let duration_ms = unsafe { brief_capture_stop() };
+    crate::transcriber::stop();
     if duration_ms < 0 {
         return Err("Nessuna registrazione in corso.".into());
     }

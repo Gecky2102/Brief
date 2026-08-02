@@ -98,7 +98,10 @@ private final class TrackSink {
             interleaved: true)!
     }
 
-    func append(_ buffer: AVAudioPCMBuffer, at elapsedMs: Int64, notify: LevelCallback?) {
+    func append(
+        _ buffer: AVAudioPCMBuffer, at elapsedMs: Int64, notify: LevelCallback?,
+        samples emitSamples: SamplesCallback?
+    ) {
         queue.sync {
             guard let converted = convert(buffer) else { return }
             guard let channel = converted.int16ChannelData, converted.frameLength > 0 else {
@@ -108,6 +111,7 @@ private final class TrackSink {
             let count = Int(converted.frameLength)
             let samples = UnsafeBufferPointer(start: channel[0], count: count)
             try? writer.write(samples)
+            emitSamples?(track, channel[0], Int32(count), elapsedMs)
 
             var sumSquares: Double = 0
             for sample in samples {
@@ -164,6 +168,12 @@ private final class TrackSink {
 
 public typealias LevelCallback = @convention(c) (Int32, Float, Int64) -> Void
 
+/// (traccia, campioni, numero di campioni, millisecondi di inizio del blocco).
+/// I campioni sono validi solo per la durata della chiamata: chi riceve deve
+/// copiarli.
+public typealias SamplesCallback = @convention(c) (Int32, UnsafePointer<Int16>, Int32, Int64)
+    -> Void
+
 @available(macOS 13.0, *)
 private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     private let engine = AVAudioEngine()
@@ -172,6 +182,7 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     private var systemSink: TrackSink?
     private var startedAt: DispatchTime?
     private var callback: LevelCallback?
+    private var samplesCallback: SamplesCallback?
 
     private var elapsedMs: Int64 {
         guard let startedAt else { return 0 }
@@ -179,8 +190,12 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         return Int64(delta / 1_000_000)
     }
 
-    func start(directory: URL, callback: @escaping LevelCallback) -> CaptureError {
+    func start(
+        directory: URL, callback: @escaping LevelCallback,
+        samples samplesCallback: @escaping SamplesCallback
+    ) -> CaptureError {
         self.callback = callback
+        self.samplesCallback = samplesCallback
 
         guard requestMicrophoneAccess() else { return .microphoneDenied }
 
@@ -228,7 +243,8 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             guard let self else { return }
-            self.micSink?.append(buffer, at: self.elapsedMs, notify: self.callback)
+            self.micSink?.append(
+                buffer, at: self.elapsedMs, notify: self.callback, samples: self.samplesCallback)
         }
 
         do {
@@ -305,7 +321,7 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
             buffer, at: 0, frameCount: Int32(frames), into: pcm.mutableAudioBufferList)
         guard status == noErr else { return }
 
-        systemSink?.append(pcm, at: elapsedMs, notify: callback)
+        systemSink?.append(pcm, at: elapsedMs, notify: callback, samples: samplesCallback)
     }
 
     func stop() -> Int64 {
@@ -330,6 +346,7 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         systemSink = nil
         startedAt = nil
         callback = nil
+        samplesCallback = nil
 
         return duration
     }
@@ -340,7 +357,8 @@ private var active: AnyObject?
 
 @_cdecl("brief_capture_start")
 public func brief_capture_start(
-    _ directory: UnsafePointer<CChar>, _ callback: @escaping LevelCallback
+    _ directory: UnsafePointer<CChar>, _ callback: @escaping LevelCallback,
+    _ samplesCallback: @escaping SamplesCallback
 ) -> Int32 {
     guard #available(macOS 13.0, *) else { return CaptureError.unsupportedOS.rawValue }
 
@@ -350,7 +368,7 @@ public func brief_capture_start(
 
     let url = URL(fileURLWithPath: String(cString: directory), isDirectory: true)
     let capture = Capture()
-    let result = capture.start(directory: url, callback: callback)
+    let result = capture.start(directory: url, callback: callback, samples: samplesCallback)
     if result == .ok { active = capture }
     return result.rawValue
 }
