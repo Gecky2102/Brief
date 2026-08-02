@@ -5,6 +5,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
+use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 
 type LevelCallback = extern "C" fn(track: i32, rms: c_float, elapsed_ms: i64);
@@ -24,6 +25,30 @@ extern "C" {
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
 static ACTIVE_DIRECTORY: Mutex<Option<PathBuf>> = Mutex::new(None);
+static TRAY: Mutex<Option<tauri::tray::TrayIcon>> = Mutex::new(None);
+
+/// Un indicatore nella barra dei menu ricorda che Brief sta registrando anche
+/// quando la finestra è nascosta dietro ad altro.
+fn show_recording_indicator(app: &AppHandle) {
+    let tray = TrayIconBuilder::new()
+        .title("● REC")
+        .tooltip("Brief sta registrando")
+        .on_tray_icon_event(|tray, _| {
+            if let Some(window) = tray.app_handle().get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        })
+        .build(app);
+
+    if let Ok(tray) = tray {
+        *TRAY.lock().unwrap() = Some(tray);
+    }
+}
+
+fn hide_recording_indicator() {
+    *TRAY.lock().unwrap() = None;
+}
 
 pub fn remember_app_handle(app: AppHandle) {
     let _ = APP.set(app);
@@ -121,6 +146,7 @@ pub fn start_recording(app: AppHandle, session_id: i64) -> Result<StartedRecordi
     }
 
     *ACTIVE_DIRECTORY.lock().unwrap() = Some(directory.clone());
+    show_recording_indicator(&app);
 
     Ok(StartedRecording {
         directory: directory.to_string_lossy().into_owned(),
@@ -131,6 +157,7 @@ pub fn start_recording(app: AppHandle, session_id: i64) -> Result<StartedRecordi
 #[tauri::command]
 pub fn stop_recording() -> Result<FinishedRecording, String> {
     let duration_ms = unsafe { brief_capture_stop() };
+    hide_recording_indicator();
     crate::transcriber::stop();
     if duration_ms < 0 {
         return Err("Nessuna registrazione in corso.".into());
