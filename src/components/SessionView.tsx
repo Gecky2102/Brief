@@ -61,11 +61,13 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState(session.title);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const load = useCallback(() => {
     setTitle(session.title);
     setError(null);
     setNotice(null);
+    setConfirmingDelete(false);
     listSegments(session.id).then(setSegments).catch(() => undefined);
     loadAnalysis(session.id).then(setAnalysis).catch(() => undefined);
   }, [session.id, session.title]);
@@ -201,12 +203,27 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           >
             Esporta audio
           </button>
-          <button
-            onClick={onDelete}
-            className="rounded-md border border-edge px-3 py-1.5 text-xs text-red-400 hover:bg-surface-raised"
-          >
-            Elimina
-          </button>
+          {confirmingDelete ? (
+            <span className="flex items-center gap-2 rounded-md border border-live/40 bg-live/10 px-3 py-1.5 text-xs">
+              <span className="text-ink-muted">Eliminare sessione e audio?</span>
+              <button onClick={onDelete} className="font-medium text-live">
+                Elimina
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="text-ink-muted hover:text-ink"
+              >
+                Annulla
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="rounded-md border border-edge px-3 py-1.5 text-xs text-ink-muted hover:border-live/50 hover:text-live"
+            >
+              Elimina
+            </button>
+          )}
         </div>
 
         {download && (

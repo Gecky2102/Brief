@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Recorder from "./components/Recorder";
 import SessionView from "./components/SessionView";
 import Spinner from "./components/Spinner";
@@ -56,7 +56,29 @@ export default function App() {
     if (ready) refresh();
   }, [ready, refresh]);
 
+  const searchInput = useRef<HTMLInputElement | null>(null);
+
+  // ⌘F porta alla ricerca, Esc la svuota o torna al registratore.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.metaKey && event.key === "f") {
+        event.preventDefault();
+        searchInput.current?.focus();
+        searchInput.current?.select();
+      } else if (event.key === "Escape") {
+        if (query) setQuery("");
+        else setSelectedId(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [query]);
+
   const selected = sessions.find((session) => session.id === selectedId) ?? null;
+  const totalMs = sessions.reduce(
+    (sum, session) => sum + session.duration_ms,
+    0,
+  );
 
   async function removeSelected(session: Session) {
     if (session.audio_path) {
@@ -90,6 +112,7 @@ export default function App() {
             </button>
           </div>
           <input
+            ref={searchInput}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Cerca nelle trascrizioni"
@@ -126,6 +149,14 @@ export default function App() {
             </button>
           ))}
         </nav>
+
+        {sessions.length > 0 && (
+          <footer className="border-t border-edge px-4 py-2.5 text-[11px] text-ink-muted">
+            {sessions.length}{" "}
+            {sessions.length === 1 ? "sessione" : "sessioni"} ·{" "}
+            {Math.round(totalMs / 60000)} min registrati
+          </footer>
+        )}
       </aside>
 
       <main className="flex-1 overflow-hidden pt-6">
