@@ -226,3 +226,40 @@ pub struct ModelsStatus {
     transcription: bool,
     analysis: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn estrae_il_json_da_una_risposta_incorniciata() {
+        let raw = "Ecco il risultato:\n```json\n{\"kind\":\"meeting\",\"title\":\"Test\"}\n```\nSpero vada bene.";
+        assert_eq!(
+            extract_json(raw).unwrap(),
+            "{\"kind\":\"meeting\",\"title\":\"Test\"}"
+        );
+    }
+
+    #[test]
+    fn regge_le_graffe_dentro_le_stringhe() {
+        let raw = r#"{"summary":"ha detto } e poi {","actions":[]}"#;
+        assert_eq!(extract_json(raw).unwrap(), raw);
+    }
+
+    #[test]
+    fn segnala_quando_non_ce_json() {
+        assert!(extract_json("nessun oggetto qui").is_none());
+        assert!(extract_json("{ mai chiuso").is_none());
+    }
+
+    #[test]
+    fn accorcia_le_trascrizioni_troppo_lunghe() {
+        let lunga = "a".repeat(MAX_TRANSCRIPT_CHARS * 2);
+        let corta = shorten(&lunga);
+        assert!(corta.chars().count() < lunga.chars().count());
+        assert!(corta.contains("parte centrale omessa"));
+
+        let breve = "ciao";
+        assert_eq!(shorten(breve), breve);
+    }
+}

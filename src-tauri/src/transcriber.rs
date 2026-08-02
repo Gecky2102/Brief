@@ -256,3 +256,34 @@ pub fn stop() {
     }
     *CONTEXT.lock().unwrap() = None;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scarta_i_marcatori_di_whisper() {
+        assert!(is_noise("[BLANK_AUDIO]"));
+        assert!(is_noise("  [BLANK_AUDIO]  "));
+        assert!(is_noise("(speaking in foreign language)"));
+        assert!(is_noise("[Musica]"));
+        assert!(is_noise("Sottotitoli e revisione a cura di QTSS"));
+        assert!(is_noise("..."));
+        assert!(is_noise(""));
+    }
+
+    #[test]
+    fn tiene_il_parlato_vero() {
+        assert!(!is_noise("Ci vediamo domani alle nove."));
+        assert!(!is_noise("Sì, va bene."));
+        // Una parentesi dentro la frase non la rende un marcatore.
+        assert!(!is_noise("Il totale (IVA inclusa) è di trecento euro."));
+    }
+
+    #[test]
+    fn calcola_il_livello_del_segnale() {
+        assert_eq!(rms(&[]), 0.0);
+        assert_eq!(rms(&[0.0, 0.0]), 0.0);
+        assert!((rms(&[1.0, -1.0]) - 1.0).abs() < f32::EPSILON);
+    }
+}
