@@ -183,6 +183,8 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
     private var startedAt: DispatchTime?
     private var callback: LevelCallback?
     private var samplesCallback: SamplesCallback?
+    private(set) var systemSampleCount: Int64 = 0
+    private(set) var systemStarted = false
 
     private var elapsedMs: Int64 {
         guard let startedAt else { return 0 }
@@ -210,11 +212,10 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         startedAt = DispatchTime.now()
 
         if let failure = startMicrophone() { return failure }
-        if let failure = startSystemAudio() {
-            engine.stop()
-            engine.inputNode.removeTap(onBus: 0)
-            return failure
-        }
+
+        // Se l'audio di sistema non parte (permesso mancante, nessun display)
+        // si registra comunque il microfono: mezza sessione vale più di niente.
+        systemStarted = startSystemAudio() == nil
 
         return .ok
     }
@@ -257,6 +258,7 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         return nil
     }
 
+    @discardableResult
     private func startSystemAudio() -> CaptureError? {
         let gate = DispatchSemaphore(value: 0)
         var result: CaptureError?
@@ -278,10 +280,12 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 // Senza questa esclusione l'app registrerebbe anche il proprio
                 // output, creando un anello di feedback nella trascrizione.
                 configuration.excludesCurrentProcessAudio = true
-                // Lo stream richiede comunque una parte video: la teniamo al
-                // minimo assoluto perché ci serve solo l'audio.
-                configuration.width = 2
-                configuration.height = 2
+                // Lo stream richiede comunque una parte video. Va tenuta
+                // piccola ma non minuscola: sotto una certa soglia
+                // ScreenCaptureKit rifiuta la configurazione e con lo stream
+                // morto non arriva nemmeno l'audio.
+                configuration.width = 128
+                configuration.height = 128
                 configuration.minimumFrameInterval = CMTime(value: 1, timescale: 1)
                 configuration.queueDepth = 3
 
@@ -290,6 +294,11 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 try stream.addStreamOutput(
                     self, type: .audio,
                     sampleHandlerQueue: DispatchQueue(label: "it.gmasiero.brief.system"))
+                // I frame video vengono scartati subito, ma senza un consumatore
+                // registrato alcune versioni di macOS non avviano lo stream.
+                try stream.addStreamOutput(
+                    self, type: .screen,
+                    sampleHandlerQueue: DispatchQueue(label: "it.gmasiero.brief.screen"))
                 try await stream.startCapture()
                 self.stream = stream
             } catch {
@@ -304,6 +313,7 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .audio, CMSampleBufferDataIsReady(buffer) else { return }
+        systemSampleCount &+= Int64(CMSampleBufferGetNumSamples(buffer))
         guard let description = CMSampleBufferGetFormatDescription(buffer),
             let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(description)
         else { return }
@@ -383,6 +393,18 @@ public func brief_capture_stop() -> Int64 {
 
     active = nil
     return capture.stop()
+}
+
+/// 1 se lo stream di sistema è attivo e sta consegnando campioni, 0 altrimenti.
+/// Serve a distinguere "nessuno stava parlando" da "la traccia non funziona".
+@_cdecl("brief_capture_system_health")
+public func brief_capture_system_health() -> Int64 {
+    guard #available(macOS 13.0, *) else { return 0 }
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    guard let capture = active as? Capture else { return 0 }
+    if !capture.systemStarted { return -1 }
+    return capture.systemSampleCount
 }
 
 @_cdecl("brief_capture_is_running")

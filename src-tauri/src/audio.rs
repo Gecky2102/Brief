@@ -19,6 +19,7 @@ extern "C" {
     ) -> i32;
     fn brief_capture_stop() -> i64;
     fn brief_capture_is_running() -> i32;
+    fn brief_capture_system_health() -> i64;
 }
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -147,6 +148,13 @@ pub fn stop_recording() -> Result<FinishedRecording, String> {
         directory: directory.to_string_lossy().into_owned(),
         duration_ms,
     })
+}
+
+/// `-1` traccia di sistema non avviata, `0` avviata ma senza campioni,
+/// altrimenti il numero di campioni ricevuti finora.
+#[tauri::command]
+pub fn system_track_health() -> i64 {
+    unsafe { brief_capture_system_health() }
 }
 
 #[tauri::command]

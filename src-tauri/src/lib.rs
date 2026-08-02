@@ -32,6 +32,7 @@ pub fn run() {
             audio::start_recording,
             audio::stop_recording,
             audio::is_recording,
+            audio::system_track_health,
             analysis::analyze_session,
             analysis::models_status,
             export::compress_recording,

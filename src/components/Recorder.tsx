@@ -12,6 +12,7 @@ import {
   onTranscriptError,
   startRecording,
   stopRecording,
+  systemTrackHealth,
   type DownloadProgress,
   type SegmentEvent,
 } from "../lib/recorder";
@@ -47,6 +48,7 @@ export default function Recorder({ onFinished }: Props) {
   const [lines, setLines] = useState<SegmentEvent[]>([]);
   const [download, setDownload] = useState<DownloadProgress | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
+  const [systemWarning, setSystemWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const startedAt = useRef<Date | null>(null);
@@ -106,6 +108,27 @@ export default function Recorder({ onFinished }: Props) {
     transcriptEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines.length]);
 
+  // La traccia di sistema fallisce in silenzio quando manca il permesso di
+  // registrazione schermo: senza questo controllo l'utente registra a vuoto.
+  useEffect(() => {
+    if (!recording) return;
+    const timer = window.setInterval(async () => {
+      const health = await systemTrackHealth().catch(() => 1);
+      if (health < 0) {
+        setSystemWarning(
+          "L'audio di sistema non è attivo: manca il permesso di registrazione schermo. Concedilo in Impostazioni di Sistema › Privacy e sicurezza › Registrazione schermo, poi riavvia Brief. Il microfono viene registrato comunque.",
+        );
+      } else if (health === 0 && elapsedMs > 20000) {
+        setSystemWarning(
+          "Nessun audio di sistema rilevato finora. Se stai registrando una call, controlla che l'audio esca dagli altoparlanti o dalle cuffie del Mac.",
+        );
+      } else if (health > 0) {
+        setSystemWarning(null);
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [recording, elapsedMs]);
+
   // Barra spaziatrice per avviare e fermare, come in ogni registratore.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -134,6 +157,7 @@ export default function Recorder({ onFinished }: Props) {
       startedAt.current = begunAt;
       lastSpeechMs.current = Date.now();
       setElapsedMs(0);
+      setSystemWarning(null);
       setPhase("recording");
       setModelReady(true);
     } catch (cause: unknown) {
@@ -280,6 +304,12 @@ export default function Recorder({ onFinished }: Props) {
           )}
           <div ref={transcriptEnd} />
         </div>
+      )}
+
+      {systemWarning && (
+        <p className="max-w-md rounded-lg border border-edge bg-surface-raised px-4 py-3 text-xs leading-relaxed text-ink-muted">
+          {systemWarning}
+        </p>
       )}
 
       {error && (

@@ -54,6 +54,11 @@ export function isRecording(): Promise<boolean> {
   return invoke<boolean>("is_recording");
 }
 
+/// -1 = traccia di sistema non avviata, 0 = avviata ma silente, >0 = campioni ricevuti.
+export function systemTrackHealth(): Promise<number> {
+  return invoke<number>("system_track_health");
+}
+
 export function modelsStatus(): Promise<ModelsStatus> {
   return invoke<ModelsStatus>("models_status");
 }
