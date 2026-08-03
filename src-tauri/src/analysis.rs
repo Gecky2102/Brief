@@ -40,6 +40,9 @@ pub struct Analysis {
 /// lunga l'analisi dura minuti e senza indicazioni sembra bloccata.
 #[derive(Clone, Serialize)]
 pub struct AnalysisProgress {
+    /// Senza questo l'avanzamento di una sessione compariva su qualunque nota
+    /// fosse aperta in quel momento.
+    session_id: i64,
     /// «reading» mentre legge i blocchi, «writing» mentre scrive il documento,
     /// «titling» per la breve chiamata che ne ricava titolo e tipo.
     phase: &'static str,
@@ -329,6 +332,7 @@ struct Session<'a> {
     app: &'a AppHandle,
     settings: settings::Settings,
     api_key: String,
+    session_id: i64,
 }
 
 impl Session<'_> {
@@ -417,6 +421,7 @@ spesso non reggono documenti lunghi.",
                     let _ = self.app.emit(
                         "analysis://progress",
                         AnalysisProgress {
+                            session_id: self.session_id,
                             phase,
                             step,
                             steps,
@@ -436,6 +441,7 @@ spesso non reggono documenti lunghi.",
         let _ = self.app.emit(
             "analysis://progress",
             AnalysisProgress {
+                session_id: self.session_id,
                 phase,
                 step,
                 steps,
@@ -454,60 +460,6 @@ pub struct AnalysisEstimate {
     characters: usize,
     chunks: usize,
     calls: usize,
-}
-
-const SYSTEM_DOMANDA: &str = "Rispondi a domande su una trascrizione, in italiano.
-
-Regole:
-- Rispondi solo con quanto risulta dalla trascrizione. Se non c'e, dillo chiaramente \
-  invece di ipotizzare.
-- Cita i passaggi rilevanti fra virgolette, indicando chi li ha detti.
-- Sii diretto: poche righe se la domanda e semplice, di piu se serve.
-- La trascrizione e automatica e contiene errori: ignora le parole incomprensibili.
-- Niente premesse né commenti sul tuo lavoro.";
-
-/// Domanda libera sulla trascrizione, con risposta in streaming.
-#[tauri::command]
-pub async fn ask_transcript(
-    app: AppHandle,
-    lines: Vec<TranscriptLine>,
-    question: String,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        if question.trim().is_empty() {
-            return Err("Scrivi una domanda.".into());
-        }
-
-        let session = Session {
-            settings: settings::load(&app),
-            api_key: settings::api_key(&app),
-            app: &app,
-        };
-
-        // Su trascrizioni molto lunghe si tiene inizio e fine: la finestra dei
-        // modelli è ampia ma non infinita.
-        let transcript = render_transcript(&lines);
-        let caratteri: Vec<char> = transcript.chars().collect();
-        let contesto = if caratteri.len() <= 60_000 {
-            transcript
-        } else {
-            let testa: String = caratteri[..30_000].iter().collect();
-            let coda: String = caratteri[caratteri.len() - 30_000..].iter().collect();
-            format!("{testa}\n[…parte centrale omessa…]\n{coda}")
-        };
-
-        session.ask(
-            SYSTEM_DOMANDA,
-            &format!("Trascrizione:\n\n{contesto}\n\nDomanda: {}", question.trim()),
-            "writing",
-            0,
-            1,
-            2_000,
-            None,
-        )
-    })
-    .await
-    .map_err(|cause| format!("Richiesta interrotta: {cause}"))?
 }
 
 #[tauri::command]
@@ -535,11 +487,12 @@ pub fn estimate_analysis(lines: Vec<TranscriptLine>) -> AnalysisEstimate {
 #[tauri::command]
 pub async fn analyze_session(
     app: AppHandle,
+    session_id: i64,
     lines: Vec<TranscriptLine>,
     context: Option<SessionContext>,
 ) -> Result<Analysis, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        analyze_blocking(app, lines, context.unwrap_or_default())
+        analyze_blocking(app, session_id, lines, context.unwrap_or_default())
     })
         .await
         .map_err(|cause| format!("Analisi interrotta: {cause}"))?
@@ -547,6 +500,7 @@ pub async fn analyze_session(
 
 fn analyze_blocking(
     app: AppHandle,
+    session_id: i64,
     lines: Vec<TranscriptLine>,
     context: SessionContext,
 ) -> Result<Analysis, String> {
@@ -558,6 +512,7 @@ fn analyze_blocking(
         settings: settings::load(&app),
         api_key: settings::api_key(&app),
         app: &app,
+        session_id,
     };
 
     let transcript = format!("{}{}", context_header(&context), render_transcript(&lines));

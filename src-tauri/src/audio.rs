@@ -21,6 +21,7 @@ extern "C" {
     fn brief_capture_stop() -> i64;
     fn brief_capture_is_running() -> i32;
     fn brief_capture_system_health() -> i64;
+    fn brief_set_gain(track: i32, value: f32);
 }
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -197,6 +198,18 @@ fn stop_blocking() -> Result<FinishedRecording, String> {
 #[tauri::command]
 pub fn system_track_health() -> i64 {
     unsafe { brief_capture_system_health() }
+}
+
+/// Guadagno di una traccia, come un cursore di mixer: 1 lascia il livello
+/// originale, valori più alti alzano il segnale fino a quattro volte.
+#[tauri::command]
+pub fn set_track_gain(track: String, value: f32) {
+    let indice = match track.as_str() {
+        "mic" => 0,
+        "system" => 1,
+        _ => return,
+    };
+    unsafe { brief_set_gain(indice, value) };
 }
 
 #[tauri::command]

@@ -60,13 +60,14 @@ const QUALITIES: { value: Quality; label: string; detail: string }[] = [
   {
     value: "fast",
     label: "Veloce",
-    detail: "Modello da 190 MB. Trascrive in tempo reale, va bene per una voce sola.",
+    detail:
+      "Modello da 190 MB. Sbaglia parecchie parole: usalo solo se lo spazio è poco.",
   },
   {
     value: "accurate",
     label: "Accurata",
     detail:
-      "Modello da 574 MB. Regge molto meglio parlato spontaneo, dialetti e più persone.",
+      "Modello da 574 MB, consigliato. Regge parlato spontaneo, dialetti e più persone.",
   },
 ];
 
@@ -191,6 +192,39 @@ export default function SettingsPanel({ onClose }: Props) {
               Avviene sul tuo Mac. L'audio non esce mai dal computer.
             </p>
           </div>
+          <div className="space-y-1.5">
+            <span className="text-xs text-ink-muted">Lingua parlata</span>
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  ["auto", "Riconosci da sola"],
+                  ["it", "Italiano"],
+                  ["en", "Inglese"],
+                  ["es", "Spagnolo"],
+                  ["fr", "Francese"],
+                  ["de", "Tedesco"],
+                ] as const
+              ).map(([codice, etichetta]) => (
+                <button
+                  key={codice}
+                  onClick={() => save({ ...settings, language: codice })}
+                  className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                    settings.language === codice
+                      ? "bg-accent text-white"
+                      : "border border-edge hover:bg-surface-raised"
+                  }`}
+                >
+                  {etichetta}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] leading-snug text-ink-muted">
+              Con una lingua fissa i passaggi nelle altre lingue vengono
+              storpiati. Scegline una solo se la conversazione è tutta in
+              quella lingua.
+            </p>
+          </div>
+
           <div className="flex gap-2">
             {QUALITIES.map((option) => (
               <button

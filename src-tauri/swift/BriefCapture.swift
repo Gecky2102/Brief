@@ -10,6 +10,26 @@ private let levelIntervalMs: Int64 = 50
 private let trackMic: Int32 = 0
 private let trackSystem: Int32 = 1
 
+/// Guadagno applicato a ciascuna traccia, come i cursori di un mixer. Il
+/// microfono e l'audio di sistema hanno spesso livelli molto diversi, e
+/// Whisper lavora male sia sul troppo basso sia sul saturo.
+private let gainLock = NSLock()
+private var trackGain: [Float] = [1.0, 1.0]
+
+func currentGain(_ track: Int32) -> Float {
+    gainLock.lock()
+    defer { gainLock.unlock() }
+    return trackGain[Int(track)]
+}
+
+@_cdecl("brief_set_gain")
+public func brief_set_gain(_ track: Int32, _ value: Float) {
+    guard track >= 0, track < 2 else { return }
+    gainLock.lock()
+    trackGain[Int(track)] = max(0.0, min(value, 4.0))
+    gainLock.unlock()
+}
+
 private enum CaptureError: Int32 {
     case ok = 0
     case microphoneDenied = 1
@@ -109,6 +129,18 @@ private final class TrackSink {
             }
 
             let count = Int(converted.frameLength)
+
+            // Guadagno e limitatore: alzare il livello serve sulle registrazioni
+            // di stanza, ma senza limite si satura e Whisper peggiora invece di
+            // migliorare.
+            let gain = currentGain(track)
+            if gain != 1.0 {
+                for indice in 0..<count {
+                    let amplificato = Float(channel[0][indice]) * gain
+                    channel[0][indice] = Int16(max(-32768, min(32767, amplificato)))
+                }
+            }
+
             let samples = UnsafeBufferPointer(start: channel[0], count: count)
             try? writer.write(samples)
             emitSamples?(track, channel[0], Int32(count), elapsedMs)

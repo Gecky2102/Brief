@@ -53,6 +53,8 @@ type Props = {
   session: Session;
   onChanged: () => void;
   onDelete: () => void;
+  /// Segnala la fine dell'analisi, così l'elenco smette di mostrarla in corso.
+  onAnalysisDone: (sessionId: number) => void;
 };
 
 function formatStamp(ms: number): string {
@@ -83,7 +85,12 @@ function groupBySpeaker(segments: Segment[]): Segment[][] {
   return gruppi;
 }
 
-export default function SessionView({ session, onChanged, onDelete }: Props) {
+export default function SessionView({
+  session,
+  onChanged,
+  onDelete,
+  onAnalysisDone,
+}: Props) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [audioPath, setAudioPath] = useState<string | null>(null);
@@ -185,7 +192,11 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       onDownloadProgress((event) =>
         setDownload(event.downloaded >= event.total ? null : event),
       ),
-      onAnalysisProgress(setProgress),
+      // Solo l'avanzamento di questa sessione: senza il filtro compariva
+      // quello di un'altra analisi in corso.
+      onAnalysisProgress((event) => {
+        if (event.session_id === session.id) setProgress(event);
+      }),
     ];
     return () => {
       subscriptions.forEach((s) => s.then((unlisten) => unlisten()));
@@ -222,7 +233,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
         ),
       ];
 
-      const result = await analyzeSession(lines, {
+      const result = await analyzeSession(session.id, lines, {
         date: new Date(session.started_at).toLocaleString("it-IT", {
           dateStyle: "full",
           timeStyle: "short",
@@ -249,6 +260,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       setAnalyzing(false);
       setProgress(null);
       setDownload(null);
+      onAnalysisDone(session.id);
     }
   }
 

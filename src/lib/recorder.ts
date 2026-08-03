@@ -56,6 +56,10 @@ export function isRecording(): Promise<boolean> {
 }
 
 /// -1 = traccia di sistema non avviata, 0 = avviata ma silente, >0 = campioni ricevuti.
+export function setTrackGain(track: Track, value: number): Promise<void> {
+  return invoke<void>("set_track_gain", { track, value });
+}
+
 export function systemTrackHealth(): Promise<number> {
   return invoke<number>("system_track_health");
 }
@@ -90,6 +94,7 @@ export type Settings = {
   report_style: ReportStyle;
   report_length: ReportLength;
   report_notes: string;
+  language: string;
   vocabulary: string;
   voice_sensitivity: VoiceSensitivity;
   expected_speakers: number;
@@ -112,6 +117,7 @@ export type StorageReport = {
 };
 
 export type AnalysisProgress = {
+  session_id: number;
   phase: "reading" | "writing" | "titling";
   step: number;
   steps: number;
@@ -192,10 +198,11 @@ export type SessionContext = {
 };
 
 export function analyzeSession(
+  sessionId: number,
   lines: { speaker: string; text: string }[],
   context: SessionContext,
 ): Promise<Analysis> {
-  return invoke<Analysis>("analyze_session", { lines, context });
+  return invoke<Analysis>("analyze_session", { sessionId, lines, context });
 }
 
 export type ImportedAudio = {
@@ -223,13 +230,6 @@ export type AnalysisEstimate = {
   chunks: number;
   calls: number;
 };
-
-export function askTranscript(
-  lines: { speaker: string; text: string }[],
-  question: string,
-): Promise<string> {
-  return invoke<string>("ask_transcript", { lines, question });
-}
 
 export function estimateAnalysis(
   lines: { speaker: string; text: string }[],

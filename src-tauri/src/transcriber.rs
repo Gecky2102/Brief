@@ -14,7 +14,7 @@ const SAMPLE_RATE: i64 = 16_000;
 const MIN_SEGMENT_MS: i64 = 1_500;
 /// Oltre questa soglia si taglia comunque, anche senza pause: meglio un taglio
 /// netto che una latenza che cresce senza fine.
-const MAX_SEGMENT_MS: i64 = 15_000;
+const MAX_SEGMENT_MS: i64 = 28_000;
 const SILENCE_TO_CUT_MS: i64 = 600;
 const SILENCE_RMS: f32 = 0.012;
 
@@ -129,12 +129,19 @@ fn transcribe(
     audio: &[f32],
     precedente: Option<&str>,
     vocabolario: &str,
+    lingua: &str,
 ) -> Result<String, String> {
     let mut state = context
         .create_state()
         .map_err(|cause| format!("Stato Whisper non creato: {cause}"))?;
 
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    // La ricerca a fascio esplora più trascrizioni possibili e sceglie la più
+    // probabile: costa qualche decimo di secondo in più e sbaglia molte meno
+    // parole della decodifica avida.
+    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+        beam_size: 5,
+        patience: 1.0,
+    });
     params.set_translate(false);
     params.set_print_special(false);
     params.set_print_progress(false);
@@ -142,9 +149,15 @@ fn transcribe(
     params.set_print_timestamps(false);
     params.set_suppress_blank(true);
     params.set_n_threads(4);
-    // Senza lingua esplicita Whisper prova a indovinarla su ogni segmento e
-    // sui pezzi brevi sbaglia, producendo inglese o "foreign language".
-    params.set_language(Some("it"));
+    // «auto» lascia riconoscere la lingua a Whisper: forzarne una sbagliata
+    // rovina i passaggi nelle altre lingue.
+    params.set_language(Some(if lingua.is_empty() { "auto" } else { lingua }));
+
+    // Soglie più permissive: quelle predefinite scartano interi segmenti di
+    // parlato reale, che è meno pulito di quello su cui il modello è misurato.
+    params.set_no_speech_thold(0.6);
+    params.set_entropy_thold(2.8);
+    params.set_temperature_inc(0.2);
 
     // Il suggerimento iniziale unisce il vocabolario dell'utente e la coda del
     // segmento precedente: il primo corregge i nomi propri, la seconda tiene
@@ -237,6 +250,7 @@ fn worker(
     soglia: f32,
     massimo: usize,
     vocabolario: String,
+    lingua: String,
     receiver: Receiver<Chunk>,
 ) {
     let mut buffer: Vec<f32> = Vec::new();
@@ -256,7 +270,7 @@ fn worker(
             return;
         }
 
-        match transcribe(&context, &audio, ultimo_testo.as_deref(), &vocabolario) {
+        match transcribe(&context, &audio, ultimo_testo.as_deref(), &vocabolario, &lingua) {
             Ok(text) if !is_noise(&text) => {
                 ultimo_testo = Some(text.clone());
                 // Il microfono è sempre chi usa Brief: non serve riconoscerlo.
@@ -358,7 +372,7 @@ pub fn transcribe_samples(
         let end_ms = (end as i64) * 1000 / SAMPLE_RATE;
 
         if rms(chunk) >= SILENCE_RMS {
-            match transcribe(&context, chunk, precedente.as_deref(), &impostazioni.vocabulary) {
+            match transcribe(&context, chunk, precedente.as_deref(), &impostazioni.vocabulary, &impostazioni.language) {
                 Ok(text) if !is_noise(&text) => {
                     precedente = Some(text.clone());
                     let _ = app.emit(
@@ -431,6 +445,7 @@ pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
         senders.push(sender);
         let speaker = speaker.clone();
         let vocabolario = impostazioni.vocabulary.clone();
+        let lingua = impostazioni.language.clone();
         workers.push(std::thread::spawn(move || {
             worker(
                 app,
@@ -441,6 +456,7 @@ pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
                 soglia,
                 massimo,
                 vocabolario,
+                lingua,
                 receiver,
             )
         }));
@@ -510,6 +526,35 @@ mod integration {
             .collect()
     }
 
+    /// Confronta la resa sui primi minuti di un audio reale: serve a misurare
+    /// l'effetto dei parametri invece di darlo per buono.
+    /// `BRIEF_TEST_WAV=… BRIEF_TEST_MODEL=… cargo test -- --ignored campione`
+    #[test]
+    #[ignore]
+    fn trascrive_un_campione() {
+        let wav = std::env::var("BRIEF_TEST_WAV").expect("BRIEF_TEST_WAV");
+        let model = std::env::var("BRIEF_TEST_MODEL").expect("BRIEF_TEST_MODEL");
+
+        let samples = read_wav_mono16(&wav);
+        let context =
+            WhisperContext::new_with_params(&model, WhisperContextParameters::default())
+                .expect("modello caricato");
+
+        let window = (SAMPLE_RATE * MAX_SEGMENT_MS / 1000) as usize;
+        let quanti = 6.min(samples.len() / window);
+
+        for indice in 0..quanti {
+            let chunk = &samples[indice * window..(indice + 1) * window];
+            if rms(chunk) < SILENCE_RMS {
+                continue;
+            }
+            match transcribe(&context, chunk, None, "", "auto") {
+                Ok(text) => println!("[{indice}] {text}"),
+                Err(message) => println!("[{indice}] ERRORE: {message}"),
+            }
+        }
+    }
+
     /// Trascrive una registrazione lunga a finestre, come fa l'importazione,
     /// e stampa il testo completo. Serve a provare la catena su audio vero.
     #[test]
@@ -532,7 +577,7 @@ mod integration {
                 scartati += 1;
                 continue;
             }
-            match transcribe(&context, chunk, None, "") {
+            match transcribe(&context, chunk, None, "", "auto") {
                 Ok(text) if !is_noise(&text) => {
 
                     tenuti += 1;
@@ -558,7 +603,7 @@ mod integration {
             WhisperContext::new_with_params(&model, WhisperContextParameters::default())
                 .expect("modello caricato");
 
-        let text = transcribe(&context, &read_wav_mono16(&wav), None, "").expect("trascrizione");
+        let text = transcribe(&context, &read_wav_mono16(&wav), None, "", "auto").expect("trascrizione");
         println!("TRASCRITTO: {text}");
 
         assert!(!is_noise(&text), "la trascrizione è stata scartata come rumore");

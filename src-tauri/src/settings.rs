@@ -12,8 +12,10 @@ use crate::provider::Provider;
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Quality {
-    #[default]
     Fast,
+    /// Predefinita: il modello piccolo sbaglia troppe parole per essere utile
+    /// su parlato reale, e la variante «turbo» del grande resta veloce.
+    #[default]
     Accurate,
 }
 
@@ -80,6 +82,9 @@ pub struct Settings {
     pub report_notes: String,
     /// Nomi propri, termini aziendali e sigle che Whisper sbaglia: passati come
     /// suggerimento, riducono di molto le storpiature che poi finiscono nel report.
+    /// Codice della lingua parlata, oppure «auto» per farla riconoscere a
+    /// Whisper. Forzarne una sbagliata rovina il riconoscimento.
+    pub language: String,
     pub vocabulary: String,
     pub voice_sensitivity: VoiceSensitivity,
     /// Zero significa «nessun limite noto»: il riconoscimento decide da solo.
@@ -97,6 +102,7 @@ impl Default for Settings {
             report_style: ReportStyle::default(),
             report_length: ReportLength::default(),
             report_notes: String::new(),
+            language: "auto".into(),
             vocabulary: String::new(),
             voice_sensitivity: VoiceSensitivity::default(),
             expected_speakers: 0,

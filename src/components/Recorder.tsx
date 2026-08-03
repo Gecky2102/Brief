@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import LevelMeter from "./LevelMeter";
+import Mixer from "./Mixer";
 import Spinner from "./Spinner";
 import Welcome from "./Welcome";
 import { archiveStats, createSession, finishSession } from "../lib/db";
@@ -385,10 +385,7 @@ export default function Recorder({ onFinished, onStarted }: Props) {
         </p>
       )}
 
-      <div className="w-full max-w-md space-y-2.5">
-        <LevelMeter label="Microfono" rms={levels.mic} active={recording} />
-        <LevelMeter label="Sistema" rms={levels.system} active={recording} />
-      </div>
+      <Mixer levels={levels} active={recording} />
 
       {importing && (
         <div className="w-full max-w-md space-y-2.5 rounded-xl border border-edge bg-surface-raised px-4 py-3.5">

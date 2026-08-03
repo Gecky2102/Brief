@@ -16,6 +16,7 @@ import {
   deleteRecording,
   embedSegments,
   exportMany,
+  onAnalysisProgress,
   onImportProgress,
   onSegment,
   searchSemantic,
@@ -95,6 +96,9 @@ export default function App() {
     done: number;
     total: number;
   } | null>(null);
+  /// Analisi in corso, con la sessione a cui appartengono: servono qui perché
+  /// il lavoro prosegue anche quando si guarda un'altra nota.
+  const [running, setRunning] = useState<Record<number, string>>({});
   const [semantic, setSemantic] = useState(false);
   const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [indexing, setIndexing] = useState(false);
@@ -167,6 +171,17 @@ export default function App() {
         }).catch(() => undefined);
         setLiveSessionId(event.session_id);
       }),
+      onAnalysisProgress((event) =>
+        setRunning((precedenti) => ({
+          ...precedenti,
+          [event.session_id]:
+            event.phase === "reading"
+              ? `lettura ${event.step + 1}/${event.steps - 1}`
+              : event.phase === "titling"
+                ? "ritocchi"
+                : `${event.words} parole`,
+        })),
+      ),
       onImportProgress((event) =>
         setLiveProgress(
           event.done_ms >= event.total_ms
@@ -520,6 +535,9 @@ export default function App() {
                   ? " · in lavorazione"
                   : ` · ${formatDuration(session.duration_ms)}`}
                 {hits[session.id] && ` · ${hits[session.id].hits} risultati`}
+                {running[session.id] && (
+                  <span className="text-accent"> · {running[session.id]}</span>
+                )}
               </span>
               {hits[session.id]?.excerpt && (
                 <span
@@ -562,6 +580,9 @@ export default function App() {
           <SessionView
             session={selected}
             onChanged={refresh}
+            onAnalysisDone={(sessionId) =>
+              setRunning(({ [sessionId]: _rimosso, ...resto }) => resto)
+            }
             onDelete={() => removeSelected(selected)}
           />
         ) : (
