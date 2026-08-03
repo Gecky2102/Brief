@@ -213,6 +213,33 @@ export default function SettingsPanel({ onClose }: Props) {
 
         <section className="space-y-3">
           <div>
+            <h3 className="text-sm font-medium">Vocabolario</h3>
+            <p className="text-xs leading-relaxed text-ink-muted">
+              Nomi di persone, aziende, sistemi e sigle che ricorrono nelle tue
+              conversazioni. Vengono suggeriti alla trascrizione, che così
+              smette di storpiarli — è il modo più efficace per migliorare la
+              qualità dei report.
+            </p>
+          </div>
+
+          <textarea
+            value={settings.vocabulary}
+            onChange={(event) =>
+              setLocalSettings({ ...settings, vocabulary: event.target.value })
+            }
+            onBlur={() => save(settings)}
+            rows={3}
+            placeholder="Marmi Rossi, EasyCo, Qlik Sense, data warehouse, Conti, Pedrotti"
+            className="brief-field w-full resize-none px-3 py-2 text-[13px] leading-relaxed"
+          />
+          <p className="text-[11px] text-ink-muted">
+            Separa i termini con una virgola. Vale per le trascrizioni
+            successive, non per quelle già fatte.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <div>
             <h3 className="text-sm font-medium">Riconoscimento delle voci</h3>
             <p className="text-xs leading-relaxed text-ink-muted">
               Brief distingue chi parla confrontando l'impronta vocale. Se

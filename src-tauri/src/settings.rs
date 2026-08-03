@@ -78,6 +78,9 @@ pub struct Settings {
     pub report_length: ReportLength,
     /// Istruzioni aggiuntive dell'utente, aggiunte in coda al prompt.
     pub report_notes: String,
+    /// Nomi propri, termini aziendali e sigle che Whisper sbaglia: passati come
+    /// suggerimento, riducono di molto le storpiature che poi finiscono nel report.
+    pub vocabulary: String,
     pub voice_sensitivity: VoiceSensitivity,
     /// Zero significa «nessun limite noto»: il riconoscimento decide da solo.
     pub expected_speakers: u32,
@@ -94,6 +97,7 @@ impl Default for Settings {
             report_style: ReportStyle::default(),
             report_length: ReportLength::default(),
             report_notes: String::new(),
+            vocabulary: String::new(),
             voice_sensitivity: VoiceSensitivity::default(),
             expected_speakers: 0,
         }

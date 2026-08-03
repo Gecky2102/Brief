@@ -90,6 +90,7 @@ export type Settings = {
   report_style: ReportStyle;
   report_length: ReportLength;
   report_notes: string;
+  vocabulary: string;
   voice_sensitivity: VoiceSensitivity;
   expected_speakers: number;
 };

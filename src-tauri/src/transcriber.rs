@@ -128,6 +128,7 @@ fn transcribe(
     context: &WhisperContext,
     audio: &[f32],
     precedente: Option<&str>,
+    vocabolario: &str,
 ) -> Result<String, String> {
     let mut state = context
         .create_state()
@@ -145,14 +146,27 @@ fn transcribe(
     // sui pezzi brevi sbaglia, producendo inglese o "foreign language".
     params.set_language(Some("it"));
 
-    // Dare a Whisper la coda del segmento precedente lo aiuta con i nomi propri
-    // e con le frasi spezzate a metà fra due finestre.
+    // Il suggerimento iniziale unisce il vocabolario dell'utente e la coda del
+    // segmento precedente: il primo corregge i nomi propri, la seconda tiene
+    // insieme le frasi spezzate fra due finestre.
+    let mut suggerimento = String::new();
+    if !vocabolario.trim().is_empty() {
+        suggerimento.push_str(vocabolario.trim());
+        suggerimento.push_str(". ");
+    }
     if let Some(testo) = precedente {
-        let coda: String = testo.chars().rev().take(200).collect::<Vec<_>>()
-            .into_iter().rev().collect();
-        if !coda.trim().is_empty() {
-            params.set_initial_prompt(&coda);
-        }
+        let coda: String = testo
+            .chars()
+            .rev()
+            .take(200)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        suggerimento.push_str(coda.trim());
+    }
+    if !suggerimento.trim().is_empty() {
+        params.set_initial_prompt(suggerimento.trim());
     }
 
     state
@@ -222,6 +236,7 @@ fn worker(
     speaker: Option<crate::diarization::SharedModel>,
     soglia: f32,
     massimo: usize,
+    vocabolario: String,
     receiver: Receiver<Chunk>,
 ) {
     let mut buffer: Vec<f32> = Vec::new();
@@ -241,7 +256,7 @@ fn worker(
             return;
         }
 
-        match transcribe(&context, &audio, ultimo_testo.as_deref()) {
+        match transcribe(&context, &audio, ultimo_testo.as_deref(), &vocabolario) {
             Ok(text) if !is_noise(&text) => {
                 ultimo_testo = Some(text.clone());
                 // Il microfono è sempre chi usa Brief: non serve riconoscerlo.
@@ -343,7 +358,7 @@ pub fn transcribe_samples(
         let end_ms = (end as i64) * 1000 / SAMPLE_RATE;
 
         if rms(chunk) >= SILENCE_RMS {
-            match transcribe(&context, chunk, precedente.as_deref()) {
+            match transcribe(&context, chunk, precedente.as_deref(), &impostazioni.vocabulary) {
                 Ok(text) if !is_noise(&text) => {
                     precedente = Some(text.clone());
                     let _ = app.emit(
@@ -415,8 +430,19 @@ pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
         let context = context.clone();
         senders.push(sender);
         let speaker = speaker.clone();
+        let vocabolario = impostazioni.vocabulary.clone();
         workers.push(std::thread::spawn(move || {
-            worker(app, session_id, track, context, speaker, soglia, massimo, receiver)
+            worker(
+                app,
+                session_id,
+                track,
+                context,
+                speaker,
+                soglia,
+                massimo,
+                vocabolario,
+                receiver,
+            )
         }));
     }
 
@@ -506,7 +532,7 @@ mod integration {
                 scartati += 1;
                 continue;
             }
-            match transcribe(&context, chunk, None) {
+            match transcribe(&context, chunk, None, "") {
                 Ok(text) if !is_noise(&text) => {
 
                     tenuti += 1;
@@ -532,7 +558,7 @@ mod integration {
             WhisperContext::new_with_params(&model, WhisperContextParameters::default())
                 .expect("modello caricato");
 
-        let text = transcribe(&context, &read_wav_mono16(&wav), None).expect("trascrizione");
+        let text = transcribe(&context, &read_wav_mono16(&wav), None, "").expect("trascrizione");
         println!("TRASCRITTO: {text}");
 
         assert!(!is_noise(&text), "la trascrizione è stata scartata come rumore");
