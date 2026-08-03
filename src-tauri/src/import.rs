@@ -54,7 +54,15 @@ pub fn import_audio(app: AppHandle, session_id: i64) -> Result<ImportedAudio, St
     let picked = app
         .dialog()
         .file()
-        .add_filter("Audio", &["m4a", "mp3", "wav", "aiff", "caf", "aac", "mp4"])
+        // Tutti verificati con afconvert: la decodifica passa da CoreAudio,
+        // che copre molto più dei formati Apple.
+        .add_filter(
+            "Audio",
+            &[
+                "m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "mp4", "m4b", "flac", "opus",
+                "ogg", "mov", "wma", "amr",
+            ],
+        )
         .blocking_pick_file()
         .ok_or_else(|| "Nessun file scelto.".to_string())?;
 
