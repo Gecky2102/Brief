@@ -91,18 +91,35 @@ pub fn stream(request: Request, mut on_delta: impl FnMut(&str)) -> Result<String
     let url = request.provider.endpoint(request.base_url, request.model);
     let body = build_body(&request);
 
-    let mut call = ureq::post(&url).header("content-type", "application/json");
-    call = match request.provider {
-        Provider::Anthropic => call
-            .header("x-api-key", request.api_key)
-            .header("anthropic-version", "2023-06-01"),
-        Provider::Google => call.header("x-goog-api-key", request.api_key),
-        _ => call.header("authorization", &format!("Bearer {}", request.api_key)),
-    };
+    // Un errore momentaneo del fornitore, dopo minuti di elaborazione, non deve
+    // buttare via tutto: si riprova con attesa crescente.
+    let mut tentativi = 0;
+    let response = loop {
+        tentativi += 1;
+        let esito = match request.provider {
+            Provider::Anthropic => ureq::post(&url)
+                .header("content-type", "application/json")
+                .header("x-api-key", request.api_key)
+                .header("anthropic-version", "2023-06-01")
+                .send_json(&body),
+            Provider::Google => ureq::post(&url)
+                .header("content-type", "application/json")
+                .header("x-goog-api-key", request.api_key)
+                .send_json(&body),
+            _ => ureq::post(&url)
+                .header("content-type", "application/json")
+                .header("authorization", &format!("Bearer {}", request.api_key))
+                .send_json(&body),
+        };
 
-    let response = call
-        .send_json(&body)
-        .map_err(|cause| describe_error(cause, request.provider))?;
+        match esito {
+            Ok(risposta) => break risposta,
+            Err(errore) if tentativi < 3 && is_temporary(&errore) => {
+                std::thread::sleep(std::time::Duration::from_secs(2 * tentativi));
+            }
+            Err(errore) => return Err(describe_error(errore, request.provider)),
+        }
+    };
 
     let reader = BufReader::new(response.into_body().into_reader());
     let mut full = String::new();
@@ -201,6 +218,16 @@ fn extract_delta(value: &serde_json::Value, provider: Provider) -> Option<String
             .get("content")?
             .as_str()
             .map(str::to_string),
+    }
+}
+
+/// Un errore che ha senso riprovare: limite di frequenza o guasto passeggero.
+fn is_temporary(errore: &ureq::Error) -> bool {
+    match errore {
+        ureq::Error::StatusCode(429) => true,
+        ureq::Error::StatusCode(code) => (500..600).contains(code),
+        ureq::Error::Io(_) => true,
+        _ => false,
     }
 }
 
