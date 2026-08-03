@@ -24,6 +24,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/002_speakers.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "allow excluding segments from the report",
+            sql: include_str!("../migrations/003_excluded.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

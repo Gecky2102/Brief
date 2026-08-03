@@ -9,6 +9,7 @@ import {
   listSegments,
   listSpeakers,
   loadAnalysis,
+  toggleSegmentExcluded,
   mergeSpeakers,
   renameSpeaker,
   saveAnalysis,
@@ -124,10 +125,12 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       return;
     }
     estimateAnalysis(
-      segments.map((segment) => ({
+      segments
+        .filter((segment) => !segment.excluded)
+        .map((segment) => ({
         speaker: speakerOf(segment.track, segment.speaker_label),
-        text: segment.text,
-      })),
+          text: segment.text,
+        })),
     )
       .then(setEstimate)
       .catch(() => undefined);
@@ -180,10 +183,12 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     try {
       // I nomi dati alle voci entrano nel report: senza, il modello non può
       // attribuire a nessuno ciò che viene detto.
-      const lines = segments.map((segment) => ({
-        speaker: speakerOf(segment.track, segment.speaker_label),
-        text: segment.text,
-      }));
+      const lines = segments
+        .filter((segment) => !segment.excluded)
+        .map((segment) => ({
+          speaker: speakerOf(segment.track, segment.speaker_label),
+          text: segment.text,
+        }));
       const nomi = [
         ...new Set(
           segments.map((segment) =>
@@ -612,9 +617,9 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
               return (
                 <div
                   key={primo.id}
-                  className={`-mx-2 flex gap-3 rounded-md px-2 py-1.5 transition-colors ${
+                  className={`group -mx-2 flex gap-3 rounded-md px-2 py-1.5 transition-colors ${
                     attivo ? "bg-accent-soft" : "hover:bg-surface-raised/50"
-                  }`}
+                  } ${primo.excluded ? "opacity-40" : ""}`}
                 >
                   <button
                     onClick={() => setSeekTo(primo.start_ms)}
@@ -623,6 +628,24 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                     className="shrink-0 pt-0.5 font-mono text-xs text-ink-muted hover:text-accent disabled:hover:text-ink-muted"
                   >
                     {formatStamp(primo.start_ms)}
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      const nuovo = !primo.excluded;
+                      for (const segment of gruppo) {
+                        await toggleSegmentExcluded(segment.id, nuovo);
+                      }
+                      ricaricaVoci();
+                    }}
+                    title={
+                      primo.excluded
+                        ? "Escluso dal report: clicca per includerlo"
+                        : "Escludi dal report"
+                    }
+                    className="shrink-0 pt-0.5 text-xs text-ink-muted opacity-0 transition-opacity hover:text-accent group-hover:opacity-100"
+                  >
+                    {primo.excluded ? "◌" : "●"}
                   </button>
 
                   <div className="min-w-0 flex-1">

@@ -35,6 +35,7 @@ export type Segment = {
   text: string;
   speaker_id: number | null;
   speaker_label: string | null;
+  excluded: number;
 };
 
 export type Speaker = {
@@ -222,6 +223,19 @@ export async function mergeSpeakers(from: number, into: number): Promise<void> {
   await conn.execute("DELETE FROM speakers WHERE id = $1", [from]);
 }
 
+/// Esclude una riga dal report senza cancellarla: capita di registrare
+/// passaggi personali che non devono finire in un documento condiviso.
+export async function toggleSegmentExcluded(
+  id: number,
+  excluded: boolean,
+): Promise<void> {
+  const conn = await db();
+  await conn.execute("UPDATE segments SET excluded = $1 WHERE id = $2", [
+    excluded ? 1 : 0,
+    id,
+  ]);
+}
+
 export async function assignSegment(
   segmentId: number,
   speakerId: number | null,
@@ -237,6 +251,7 @@ export async function listSegments(sessionId: number): Promise<Segment[]> {
   const conn = await db();
   return conn.select<Segment[]>(
     `SELECT g.id, g.track, g.start_ms, g.end_ms, g.text, g.speaker_id,
+            COALESCE(g.excluded, 0) AS excluded,
             p.label AS speaker_label
      FROM segments g
      LEFT JOIN speakers p ON p.id = g.speaker_id
