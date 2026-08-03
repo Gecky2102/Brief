@@ -87,6 +87,7 @@ export function toMarkdown(
 }
 
 export function fileNameFor(session: Session): string {
+  const data = new Date(session.started_at).toISOString().slice(0, 10);
   const slug = session.title
     .toLowerCase()
     .normalize("NFD")
@@ -94,5 +95,5 @@ export function fileNameFor(session: Session): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
-  return `${slug || "sessione"}.md`;
+  return `${data}-${slug || "sessione"}.md`;
 }

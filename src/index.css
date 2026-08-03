@@ -307,3 +307,33 @@ textarea::placeholder {
     color: #000;
   }
 }
+
+
+/* Il documento in lettura: misure tipografiche da carta, non da pagina web. */
+.brief-report {
+  font-feature-settings: "kern" 1, "liga" 1, "onum" 1;
+}
+.brief-report p {
+  text-wrap: pretty;
+  hyphens: auto;
+}
+.brief-report h1,
+.brief-report h2,
+.brief-report h3 {
+  text-wrap: balance;
+}
+/* Evidenzia le celle «non indicato»: si vedono subito i buchi da colmare. */
+.brief-report td:has(> em),
+.brief-report td:empty {
+  color: var(--ink-muted);
+}
+.brief-report blockquote {
+  font-style: normal;
+}
+.brief-report ul li::marker {
+  color: var(--accent);
+}
+.brief-report ol li::marker {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
