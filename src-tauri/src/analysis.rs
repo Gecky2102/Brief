@@ -12,6 +12,7 @@ use tauri::AppHandle;
 use crate::models;
 
 const CONTEXT_TOKENS: u32 = 8192;
+const BATCH_TOKENS: usize = 512;
 const MAX_OUTPUT_TOKENS: i32 = 900;
 /// Il modello ha una finestra finita: oltre questa soglia la trascrizione viene
 /// accorciata tenendo l'inizio e la fine, dove di solito stanno inquadramento e
@@ -121,7 +122,7 @@ fn generate(model_path: &std::path::Path, prompt: &str) -> Result<String, String
 
     let context_params = LlamaContextParams::default()
         .with_n_ctx(NonZeroU32::new(CONTEXT_TOKENS))
-        .with_n_batch(512);
+        .with_n_batch(BATCH_TOKENS as u32);
     let mut context = model
         .new_context(&backend, context_params)
         .map_err(|cause| format!("Contesto di analisi non creato: {cause}"))?;
@@ -134,16 +135,27 @@ fn generate(model_path: &std::path::Path, prompt: &str) -> Result<String, String
         return Err("La trascrizione è troppo lunga per il modello di analisi.".into());
     }
 
-    let mut batch = LlamaBatch::new(512, 1);
-    let last = tokens.len() - 1;
-    for (position, token) in tokens.iter().enumerate() {
-        batch
-            .add(*token, position as i32, &[0], position == last)
+    // Il batch ha una capienza fissa: un prompt più lungo va consegnato a
+    // blocchi, altrimenti llama.cpp rifiuta con "Insufficient Space".
+    let mut batch = LlamaBatch::new(BATCH_TOKENS, 1);
+    for (index, chunk) in tokens.chunks(BATCH_TOKENS).enumerate() {
+        batch.clear();
+        let base = index * BATCH_TOKENS;
+        let is_final_chunk = base + chunk.len() == tokens.len();
+
+        for (offset, token) in chunk.iter().enumerate() {
+            // Solo l'ultimo token dell'ultimo blocco produce i logit da cui
+            // parte la generazione.
+            let wants_logits = is_final_chunk && offset == chunk.len() - 1;
+            batch
+                .add(*token, (base + offset) as i32, &[0], wants_logits)
+                .map_err(|cause| format!("Analisi fallita: {cause}"))?;
+        }
+
+        context
+            .decode(&mut batch)
             .map_err(|cause| format!("Analisi fallita: {cause}"))?;
     }
-    context
-        .decode(&mut batch)
-        .map_err(|cause| format!("Analisi fallita: {cause}"))?;
 
     let mut sampler = LlamaSampler::chain_simple([
         LlamaSampler::temp(0.3),
@@ -152,7 +164,7 @@ fn generate(model_path: &std::path::Path, prompt: &str) -> Result<String, String
     ]);
 
     let mut output = String::new();
-    let mut position = batch.n_tokens();
+    let mut position = tokens.len() as i32;
     let mut decoder = encoding_rs::UTF_8.new_decoder();
 
     for _ in 0..MAX_OUTPUT_TOKENS {
@@ -285,6 +297,28 @@ mod tests {
 #[cfg(test)]
 mod integration {
     use super::*;
+
+    /// Prompt volutamente oltre i 512 token del batch: è il caso che faceva
+    /// fallire l'analisi con «Insufficient Space».
+    #[test]
+    #[ignore]
+    fn analizza_una_conversazione_lunga() {
+        let model = std::env::var("BRIEF_TEST_LLM").expect("BRIEF_TEST_LLM");
+
+        let mut transcript = String::new();
+        for turno in 1..=40 {
+            transcript.push_str(&format!(
+                "Io: Punto numero {turno}, dobbiamo rivedere le stime di consegna del modulo di fatturazione e capire se il fornitore riesce a rispettare i tempi concordati.\nInterlocutore: Sono d'accordo, però prima serve la conferma scritta dal reparto acquisti, altrimenti rischiamo di bloccare tutto un'altra volta.\n"
+            ));
+        }
+
+        let prompt = build_prompt(&transcript);
+        let raw = generate(std::path::Path::new(&model), &prompt).expect("generazione");
+        let json = extract_json(&raw).expect("json presente");
+        let analysis: Analysis = serde_json::from_str(&json).expect("json valido");
+        println!("LUNGO -> TITOLO: {} | AZIONI: {}", analysis.title, analysis.actions.len());
+        assert!(!analysis.summary.trim().is_empty());
+    }
 
     #[test]
     #[ignore]
