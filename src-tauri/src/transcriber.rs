@@ -159,6 +159,13 @@ fn worker(
             return;
         }
         let audio = std::mem::take(buffer);
+
+        // Far girare Whisper su un buffer muto costa CPU e batteria per
+        // ottenere solo [BLANK_AUDIO]: si scarta prima di caricare il modello.
+        if rms(&audio) < SILENCE_RMS {
+            return;
+        }
+
         match transcribe(&context, &audio) {
             Ok(text) if !is_noise(&text) => {
                 let _ = app.emit(
