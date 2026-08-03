@@ -74,16 +74,24 @@ body {
   background-color: var(--content);
 }
 
-/* Trascina la finestra dai margini vuoti in alto, come in ogni app macOS. */
-.brief-drag {
+/* Striscia trascinabile fissata in cima: applicare la regione di trascinamento
+   a contenitori scrollabili non funziona, il contenuto la copre. */
+.brief-titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  z-index: 40;
   -webkit-app-region: drag;
+  pointer-events: auto;
 }
-.brief-drag button,
-.brief-drag input,
-.brief-drag select,
-.brief-drag textarea,
-.brief-drag a {
+
+/* I comandi che stanno dentro la striscia devono restare cliccabili. */
+.brief-no-drag {
   -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 41;
 }
 
 ::-webkit-scrollbar {

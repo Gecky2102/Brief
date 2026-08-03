@@ -197,6 +197,33 @@ fn title_from_report(report: &str) -> String {
         .unwrap_or_else(|| "Report della sessione".into())
 }
 
+/// Riconosce le risposte in cui il modello si tira indietro invece di
+/// scrivere: capita quando si convince di essere un assistente con strumenti,
+/// e va ritentato con istruzioni più dirette.
+fn is_refusal(testo: &str) -> bool {
+    let normalizzato = testo.trim().to_lowercase();
+    if normalizzato.contains("\n# ") || normalizzato.starts_with("# ") {
+        return false;
+    }
+
+    const SEGNALI: [&str; 12] = [
+        "mi serve accesso",
+        "non posso eseguire",
+        "non posso generare",
+        "non sono in grado di",
+        "non ho accesso",
+        "senza le api",
+        "strumenti esterni",
+        "posso procedere fornendo",
+        "posso fornirti un modello",
+        "i need access",
+        "i cannot generate",
+        "i'm unable to",
+    ];
+
+    SEGNALI.iter().any(|segnale| normalizzato.contains(segnale))
+}
+
 /// Ripulisce l'output dal contorno che i modelli aggiungono comunque: la
 /// premessa prima del titolo e le offerte di aiuto in coda.
 fn clean_report(raw: &str) -> String {
@@ -268,6 +295,57 @@ struct Session<'a> {
 }
 
 impl Session<'_> {
+    /// Scrive il documento, riprovando una volta con istruzioni più dirette se
+    /// il modello si tira indietro invece di produrlo.
+    fn write_report(
+        &self,
+        system: &str,
+        user: &str,
+        step: usize,
+        steps: usize,
+        max_tokens: u32,
+    ) -> Result<String, String> {
+        // Il prefill funziona davvero solo con Anthropic: altrove il messaggio
+        // dell'assistente apre un turno nuovo invece di continuarlo.
+        let prefill = if self.settings.provider == crate::provider::Provider::Anthropic {
+            Some("# ")
+        } else {
+            None
+        };
+
+        let primo = self.ask(system, user, "writing", step, steps, max_tokens, prefill)?;
+        if !is_refusal(&primo) {
+            return Ok(primo);
+        }
+
+        let insistente = format!(
+            "{system}\n\nHai già tutto ciò che serve: la trascrizione è qui sotto, \
+non ti occorre nessuno strumento esterno, nessuna API e nessuna conferma. \
+Scrivi il documento adesso, cominciando dalla riga con «# » e il titolo. \
+Non spiegare cosa potresti fare: fallo."
+        );
+
+        let secondo = self.ask(
+            &insistente,
+            &format!("{user}\n\nScrivi ora il documento completo."),
+            "writing",
+            step,
+            steps,
+            max_tokens,
+            prefill,
+        )?;
+
+        if is_refusal(&secondo) {
+            return Err(format!(
+                "Il modello «{}» si rifiuta di produrre il documento. \
+Provane un altro dalle impostazioni: i modelli piccoli o pensati per il codice \
+spesso non reggono documenti lunghi.",
+                self.settings.model
+            ));
+        }
+        Ok(secondo)
+    }
+
     /// Esegue una richiesta riportando il testo mentre arriva, così
     /// l'interfaccia può mostrarlo scorrere invece di uno spinner muto.
     fn ask(
@@ -482,7 +560,7 @@ fn analyze_blocking(
     let report_tokens = tokens_per(session.settings.report_length);
 
     let report = if transcript.chars().count() <= SINGLE_PASS_CHARS {
-        session.ask(&system_report, &transcript, "writing", 0, 1, report_tokens, Some("# "))?
+        session.write_report(&system_report, &transcript, 0, 1, report_tokens)?
     } else {
         // Prima note dettagliate blocco per blocco, poi il documento finale:
         // così nessuna parte della riunione resta fuori dal report.
@@ -508,14 +586,12 @@ fn analyze_blocking(
             parziali.push_str("\n\n");
         }
 
-        session.ask(
+        session.write_report(
             &system_report,
             &format!("Note prese durante la riunione, in ordine cronologico:\n\n{parziali}"),
-            "writing",
             totale,
             totale + 1,
             report_tokens,
-            Some("# "),
         )?
     };
 
@@ -624,5 +700,28 @@ Dimmi se vuoi che proceda.";
     fn lascia_intatto_un_documento_pulito() {
         let raw = "# Titolo\n\n## Quadro generale\nContenuto.\n\n## Rischi\nAltro contenuto.";
         assert_eq!(clean_report(raw), raw);
+    }
+}
+
+#[cfg(test)]
+mod rifiuti {
+    use super::*;
+
+    #[test]
+    fn riconosce_il_rifiuto() {
+        assert!(is_refusal(
+            "Mi serve accesso agli strumenti esterni per generare il documento."
+        ));
+        assert!(is_refusal(
+            "Attualmente non posso eseguire quell'elaborazione senza le API richieste."
+        ));
+        assert!(is_refusal("Se vuoi, posso fornirti un modello strutturato."));
+    }
+
+    #[test]
+    fn non_scambia_un_documento_per_rifiuto() {
+        assert!(!is_refusal(
+            "# Riunione sul gestionale\n\n## Quadro generale\nSi è parlato di API e strumenti esterni."
+        ));
     }
 }

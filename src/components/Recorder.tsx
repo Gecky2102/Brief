@@ -303,7 +303,7 @@ export default function Recorder({ onFinished }: Props) {
         </div>
       )}
 
-      <div className="brief-drag flex w-full flex-1 flex-col items-center gap-7 overflow-y-auto px-8 pb-10 pt-14">
+      <div className="flex w-full flex-1 flex-col items-center gap-7 overflow-y-auto px-8 pb-10 pt-14">
       <div className="flex flex-col items-center gap-5">
         <div className="flex items-center gap-3">
           {recording && (

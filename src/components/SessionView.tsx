@@ -4,7 +4,6 @@ import ReportView from "./ReportView";
 import SpeakerBar, { speakerColor } from "./SpeakerBar";
 import AudioPlayer from "./AudioPlayer";
 import SpeakerStats from "./SpeakerStats";
-import AskPanel from "./AskPanel";
 import {
   KIND_LABELS,
   listSegments,
@@ -99,7 +98,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState(session.title);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [tab, setTab] = useState<"report" | "transcript" | "ask">("report");
+  const [tab, setTab] = useState<"report" | "transcript">("report");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -317,7 +316,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <header className="brief-drag space-y-3 border-b border-edge px-8 pb-5 pt-12">
+      <header className="space-y-3 border-b border-edge px-8 pb-5 pt-12">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -508,7 +507,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       </header>
 
       <div className="flex gap-1 border-b border-edge px-8">
-        {(["report", "transcript", "ask"] as const).map((value) => (
+        {(["report", "transcript"] as const).map((value) => (
           <button
             key={value}
             onClick={() => setTab(value)}
@@ -518,11 +517,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                 : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >
-            {value === "report"
-              ? "Report"
-              : value === "transcript"
-                ? "Trascrizione"
-                : "Domande"}
+            {value === "report" ? "Report" : "Trascrizione"}
           </button>
         ))}
       </div>
@@ -585,17 +580,6 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             )
           ))}
 
-
-        {tab === "ask" && (
-          <AskPanel
-            lines={segments
-              .filter((segment) => !segment.excluded)
-              .map((segment) => ({
-                speaker: speakerOf(segment.track, segment.speaker_label),
-                text: segment.text,
-              }))}
-          />
-        )}
 
         {tab === "transcript" && (
         <section className="space-y-4">

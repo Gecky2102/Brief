@@ -173,7 +173,7 @@ export default function SettingsPanel({ onClose }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <header className="brief-drag flex items-center justify-between border-b border-edge px-8 pb-4 pt-12">
+      <header className="flex items-center justify-between border-b border-edge px-8 pb-4 pt-12">
         <h2 className="text-[19px] font-semibold tracking-tight">Impostazioni</h2>
         <button
           onClick={onClose}

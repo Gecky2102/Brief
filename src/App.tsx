@@ -256,11 +256,12 @@ export default function App() {
 
   return (
     <div className="flex h-full">
+      <div className="brief-titlebar" />
       <aside className="flex w-64 shrink-0 flex-col border-r border-edge">
-        <header className="brief-drag space-y-2.5 px-3 pb-2.5 pt-11">
+        <header className="space-y-2.5 px-3 pb-2.5 pt-11">
           <div className="flex items-center justify-between">
             <h1 className="text-[13px] font-semibold tracking-tight">Brief</h1>
-            <div className="flex items-center gap-1.5">
+            <div className="brief-no-drag flex items-center gap-1.5">
               <button
                 onClick={() => setShowSettings(true)}
                 title="Impostazioni"
