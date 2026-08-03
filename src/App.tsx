@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Recorder from "./components/Recorder";
 import SessionView from "./components/SessionView";
 import SettingsPanel from "./components/SettingsPanel";
+import Shortcuts from "./components/Shortcuts";
 import Spinner from "./components/Spinner";
 import {
   deleteSession,
@@ -63,6 +64,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -113,14 +115,20 @@ export default function App() {
         event.preventDefault();
         searchInput.current?.focus();
         searchInput.current?.select();
+      } else if (event.key === "?" && !event.metaKey) {
+        const target = event.target as HTMLElement | null;
+        if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+        event.preventDefault();
+        setShowShortcuts(true);
       } else if (event.key === "Escape") {
-        if (query) setQuery("");
+        if (showShortcuts) setShowShortcuts(false);
+        else if (query) setQuery("");
         else setSelectedId(null);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [query]);
+  }, [query, showShortcuts]);
 
   const selected = sessions.find((session) => session.id === selectedId) ?? null;
   const totalMs = sessions.reduce(
@@ -309,6 +317,8 @@ export default function App() {
           />
         )}
       </main>
+
+      {showShortcuts && <Shortcuts onClose={() => setShowShortcuts(false)} />}
 
       {error && (
         <p className="absolute bottom-4 left-4 rounded-md border border-edge bg-surface-raised px-3 py-2 text-xs text-red-400">
