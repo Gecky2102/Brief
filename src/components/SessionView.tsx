@@ -107,7 +107,11 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     setError(null);
     setNotice(null);
     setConfirmingDelete(false);
-    listSegments(session.id).then(setSegments).catch(() => undefined);
+    listSegments(session.id)
+      .then(setSegments)
+      .catch((cause: unknown) =>
+        setError(`Trascrizione non caricata: ${cause}`),
+      );
     listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
     getSettings().then(setLocalSettings).catch(() => undefined);
     setEstimate(null);
@@ -121,6 +125,16 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   }, [session.id, session.title]);
 
   useEffect(load, [load]);
+
+  // Finché la sessione è in lavorazione le righe arrivano poco per volta:
+  // senza un aggiornamento periodico sembrerebbe ferma.
+  useEffect(() => {
+    if (session.ended_at !== null) return;
+    const timer = window.setInterval(() => {
+      listSegments(session.id).then(setSegments).catch(() => undefined);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [session.id, session.ended_at]);
 
   // Quanto testo verrà inviato e quante chiamate serviranno: su una riunione
   // lunga la differenza fra un blocco e otto si sente nella bolletta.
@@ -246,7 +260,11 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   }
 
   const ricaricaVoci = useCallback(() => {
-    listSegments(session.id).then(setSegments).catch(() => undefined);
+    listSegments(session.id)
+      .then(setSegments)
+      .catch((cause: unknown) =>
+        setError(`Trascrizione non caricata: ${cause}`),
+      );
     listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
   }, [session.id]);
 
@@ -612,9 +630,22 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             />
           )}
           {segments.length === 0 ? (
-            <p className="text-sm text-ink-muted">
-              Nessun parlato riconosciuto in questa sessione.
-            </p>
+            <div className="space-y-2 py-8 text-center">
+              {session.ended_at === null ? (
+                <>
+                  <Spinner size="md" />
+                  <p className="text-xs leading-relaxed text-ink-muted">
+                    Questa sessione è ancora in lavorazione: le righe compaiono
+                    man mano che vengono trascritte.
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs leading-relaxed text-ink-muted">
+                  Nessun parlato riconosciuto. Può succedere se l'audio era
+                  muto, troppo basso o senza voce.
+                </p>
+              )}
+            </div>
           ) : (
             groupBySpeaker(
               segments.filter(

@@ -432,7 +432,9 @@ export default function App() {
                   day: "numeric",
                   month: "short",
                 })}{" "}
-                · {formatDuration(session.duration_ms)}
+                {session.ended_at === null
+                  ? " · in lavorazione"
+                  : ` · ${formatDuration(session.duration_ms)}`}
                 {hits[session.id] && ` · ${hits[session.id].hits} risultati`}
               </span>
               {hits[session.id]?.excerpt && (
