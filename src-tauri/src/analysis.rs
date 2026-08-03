@@ -57,9 +57,14 @@ senza blocchi di codice. Lo schema è:
 \"summary\": \"riassunto in 3-6 frasi\", \"decisions\": [\"...\"], \"actions\": [\"...\"], \
 \"questions\": [\"...\"]}
 Regole: `kind` è il tipo di conversazione che deduci. `title` massimo 8 parole. \
-`decisions` sono le decisioni prese, `actions` le cose da fare (con il responsabile se emerge), \
-`questions` le domande rimaste aperte. Se una lista è vuota lascia []. \
-Non inventare nulla che non sia nella trascrizione. Scrivi in italiano.";
+`decisions` sono le decisioni già prese, al passato. \
+`actions` sono le cose ancora da fare: ognuna inizia con un verbo all'infinito e \
+indica il responsabile tra parentesi se emerge dalla trascrizione, \
+per esempio «Sentire Marco per la conferma (io)» oppure «Inviare il preventivo entro mercoledì (io)». \
+Non ripetere la stessa azione in più voci. \
+`questions` sono le domande rimaste senza risposta. \
+Se una lista è vuota lascia []. Non inventare nulla che non sia nella trascrizione. \
+Scrivi in italiano corretto e scorrevole.";
 
     format!(
         "<|im_start|>system\n{system}<|im_end|>\n\
