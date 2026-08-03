@@ -110,16 +110,20 @@ export default function Recorder({ onFinished }: Props) {
       }),
       onTranscriptError(setError),
       onImportProgress((event) => {
-        // Stima il tempo mancante dal ritmo tenuto finora: whisper procede in
-        // modo abbastanza regolare da renderla attendibile.
+        // Se il componente è stato rimontato durante l'importazione il momento
+        // di partenza si è perso: si riparte da adesso invece di calcolare una
+        // stima assurda a partire dal 1970.
+        if (importStarted.current === 0) importStarted.current = Date.now();
+
         const trascorso = Date.now() - importStarted.current;
         const frazione = event.done_ms / Math.max(event.total_ms, 1);
-        const eta = frazione > 0.01 ? (trascorso / frazione) * (1 - frazione) : 0;
-        setImporting({
-          done: event.done_ms,
-          total: event.total_ms,
-          eta: Math.round(eta),
-        });
+        const stima = frazione > 0.02 ? (trascorso / frazione) * (1 - frazione) : 0;
+
+        // Una stima oltre le ventiquattro ore è certamente sbagliata: meglio
+        // non mostrarla che mostrarne una assurda.
+        const eta = stima > 0 && stima < 86_400_000 ? Math.round(stima) : 0;
+
+        setImporting({ done: event.done_ms, total: event.total_ms, eta });
       }),
       onDownloadProgress((event) => {
         setDownload(event.downloaded >= event.total ? null : event);
@@ -343,7 +347,12 @@ export default function Recorder({ onFinished }: Props) {
             {[
               [stats.sessions, stats.sessions === 1 ? "sessione" : "sessioni"],
               [stats.minutes, "minuti"],
-              [Math.round(stats.words / 1000), "mila parole"],
+              [
+                stats.words >= 1000
+                  ? `${Math.round(stats.words / 1000)}K`
+                  : stats.words,
+                "parole",
+              ],
               [stats.reports, stats.reports === 1 ? "report" : "report"],
             ].map(([valore, etichetta]) => (
               <span key={String(etichetta)} className="flex flex-col">

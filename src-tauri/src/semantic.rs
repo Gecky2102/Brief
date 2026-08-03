@@ -60,6 +60,12 @@ impl Embedder {
         let tensore_mask = ort::value::Tensor::from_array((vec![1, lunghezza], mask.clone()))
             .map_err(|cause| format!("Ingresso non preparato: {cause}"))?;
 
+        // Il modello pretende anche i tipi di segmento: qui c'è una sola frase,
+        // quindi sono tutti zero, ma senza il tensore l'esecuzione fallisce.
+        let tensore_tipi =
+            ort::value::Tensor::from_array((vec![1, lunghezza], vec![0_i64; lunghezza]))
+                .map_err(|cause| format!("Ingresso non preparato: {cause}"))?;
+
         let mut session = self
             .session
             .lock()
@@ -69,6 +75,7 @@ impl Embedder {
             .run(ort::inputs![
                 "input_ids" => tensore_ids,
                 "attention_mask" => tensore_mask,
+                "token_type_ids" => tensore_tipi,
             ])
             .map_err(|cause| format!("Ricerca fallita: {cause}"))?;
 
