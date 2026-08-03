@@ -340,6 +340,60 @@ pub struct AnalysisEstimate {
     calls: usize,
 }
 
+const SYSTEM_DOMANDA: &str = "Rispondi a domande su una trascrizione, in italiano.
+
+Regole:
+- Rispondi solo con quanto risulta dalla trascrizione. Se non c'e, dillo chiaramente \
+  invece di ipotizzare.
+- Cita i passaggi rilevanti fra virgolette, indicando chi li ha detti.
+- Sii diretto: poche righe se la domanda e semplice, di piu se serve.
+- La trascrizione e automatica e contiene errori: ignora le parole incomprensibili.
+- Niente premesse né commenti sul tuo lavoro.";
+
+/// Domanda libera sulla trascrizione, con risposta in streaming.
+#[tauri::command]
+pub async fn ask_transcript(
+    app: AppHandle,
+    lines: Vec<TranscriptLine>,
+    question: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if question.trim().is_empty() {
+            return Err("Scrivi una domanda.".into());
+        }
+
+        let session = Session {
+            settings: settings::load(&app),
+            api_key: settings::api_key(&app),
+            app: &app,
+        };
+
+        // Su trascrizioni molto lunghe si tiene inizio e fine: la finestra dei
+        // modelli è ampia ma non infinita.
+        let transcript = render_transcript(&lines);
+        let caratteri: Vec<char> = transcript.chars().collect();
+        let contesto = if caratteri.len() <= 60_000 {
+            transcript
+        } else {
+            let testa: String = caratteri[..30_000].iter().collect();
+            let coda: String = caratteri[caratteri.len() - 30_000..].iter().collect();
+            format!("{testa}\n[…parte centrale omessa…]\n{coda}")
+        };
+
+        session.ask(
+            SYSTEM_DOMANDA,
+            &format!("Trascrizione:\n\n{contesto}\n\nDomanda: {}", question.trim()),
+            "writing",
+            0,
+            1,
+            2_000,
+            None,
+        )
+    })
+    .await
+    .map_err(|cause| format!("Richiesta interrotta: {cause}"))?
+}
+
 #[tauri::command]
 pub fn estimate_analysis(lines: Vec<TranscriptLine>) -> AnalysisEstimate {
     let caratteri: usize = lines

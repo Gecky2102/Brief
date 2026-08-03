@@ -202,6 +202,13 @@ export type AnalysisEstimate = {
   calls: number;
 };
 
+export function askTranscript(
+  lines: { speaker: string; text: string }[],
+  question: string,
+): Promise<string> {
+  return invoke<string>("ask_transcript", { lines, question });
+}
+
 export function estimateAnalysis(
   lines: { speaker: string; text: string }[],
 ): Promise<AnalysisEstimate> {
