@@ -80,6 +80,8 @@ export type ReportStyle =
 
 export type ReportLength = "brief" | "standard" | "deep";
 
+export type VoiceSensitivity = "low" | "medium" | "high";
+
 export type Settings = {
   quality: Quality;
   provider: Provider;
@@ -88,6 +90,8 @@ export type Settings = {
   report_style: ReportStyle;
   report_length: ReportLength;
   report_notes: string;
+  voice_sensitivity: VoiceSensitivity;
+  expected_speakers: number;
 };
 
 export type ModelStatus = {

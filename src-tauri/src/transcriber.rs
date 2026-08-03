@@ -49,11 +49,15 @@ static VOICES: Mutex<Vec<Vec<f32>>> = Mutex::new(Vec::new());
 /// Sopra questa somiglianza due porzioni sono considerate della stessa persona.
 /// Tarata verso l'alto: separare per sbaglio due interventi della stessa voce
 /// si corregge con un clic, mentre fondere due persone diverse è più fastidioso.
-const SAME_VOICE: f32 = 0.62;
 const MAX_VOICES: usize = 8;
 
 /// Assegna la porzione a una voce già sentita, o ne apre una nuova.
-fn assign_voice(model: &Option<crate::diarization::SharedModel>, audio: &[f32]) -> Option<usize> {
+fn assign_voice(
+    model: &Option<crate::diarization::SharedModel>,
+    audio: &[f32],
+    soglia: f32,
+    massimo: usize,
+) -> Option<usize> {
     let model = model.as_ref()?;
     let durata = audio.len() as f32 / SAMPLE_RATE as f32;
     if durata < crate::diarization::MIN_SPEECH_SECONDS {
@@ -72,7 +76,7 @@ fn assign_voice(model: &Option<crate::diarization::SharedModel>, audio: &[f32]) 
     }
 
     match migliore {
-        Some((indice, punteggio)) if punteggio >= SAME_VOICE => {
+        Some((indice, punteggio)) if punteggio >= soglia => {
             // Sposta il riferimento verso la media, così regge i cambi di tono.
             let nota = &mut voci[indice];
             for (valore, nuovo) in nota.iter_mut().zip(impronta.iter()) {
@@ -84,7 +88,7 @@ fn assign_voice(model: &Option<crate::diarization::SharedModel>, audio: &[f32]) 
             }
             Some(indice)
         }
-        _ if voci.len() < MAX_VOICES => {
+        _ if voci.len() < massimo => {
             voci.push(impronta);
             Some(voci.len() - 1)
         }
@@ -202,6 +206,8 @@ fn worker(
     track: &'static str,
     context: Arc<WhisperContext>,
     speaker: Option<crate::diarization::SharedModel>,
+    soglia: f32,
+    massimo: usize,
     receiver: Receiver<Chunk>,
 ) {
     let mut buffer: Vec<f32> = Vec::new();
@@ -226,7 +232,7 @@ fn worker(
                 let voice = if track == "mic" {
                     None
                 } else {
-                    assign_voice(&speaker, &audio)
+                    assign_voice(&speaker, &audio, soglia, massimo)
                 };
 
                 let _ = app.emit(
@@ -302,6 +308,14 @@ pub fn transcribe_samples(
         .and_then(|percorso| crate::diarization::SpeakerModel::load(&percorso).ok())
         .map(Arc::new);
 
+    let impostazioni = crate::settings::load(app);
+    let soglia = impostazioni.voice_sensitivity.threshold();
+    let massimo = if impostazioni.expected_speakers > 0 {
+        impostazioni.expected_speakers as usize
+    } else {
+        MAX_VOICES
+    };
+
     let window = (SAMPLE_RATE * MAX_SEGMENT_MS / 1000) as usize;
     let mut offset = 0_usize;
 
@@ -322,7 +336,7 @@ pub fn transcribe_samples(
                             start_ms,
                             end_ms,
                             text,
-                            speaker: assign_voice(&speaker, chunk),
+                            speaker: assign_voice(&speaker, chunk, soglia, massimo),
                         },
                     );
                 }
@@ -361,6 +375,14 @@ pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
         .and_then(|percorso| crate::diarization::SpeakerModel::load(&percorso).ok())
         .map(Arc::new);
 
+    let impostazioni = crate::settings::load(app);
+    let soglia = impostazioni.voice_sensitivity.threshold();
+    let massimo = if impostazioni.expected_speakers > 0 {
+        impostazioni.expected_speakers as usize
+    } else {
+        MAX_VOICES
+    };
+
     let context = Arc::new(
         WhisperContext::new_with_params(&path, WhisperContextParameters::default())
         .map_err(|cause| format!("Modello di trascrizione non caricato: {cause}"))?,
@@ -376,7 +398,7 @@ pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
         senders.push(sender);
         let speaker = speaker.clone();
         workers.push(std::thread::spawn(move || {
-            worker(app, session_id, track, context, speaker, receiver)
+            worker(app, session_id, track, context, speaker, soglia, massimo, receiver)
         }));
     }
 

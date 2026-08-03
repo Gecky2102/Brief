@@ -12,6 +12,7 @@ import {
   type Provider,
   type Quality,
   type ReportLength,
+  type VoiceSensitivity,
   type ReportStyle,
   type Settings,
   type StorageReport,
@@ -185,6 +186,67 @@ export default function SettingsPanel({ onClose }: Props) {
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-medium">Riconoscimento delle voci</h3>
+            <p className="text-xs leading-relaxed text-ink-muted">
+              Brief distingue chi parla confrontando l'impronta vocale. Se
+              spezza la stessa persona in due voci abbassa la sensibilità; se
+              confonde persone diverse, alzala.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            {(
+              [
+                { value: "low", label: "Bassa", detail: "Meno voci distinte" },
+                { value: "medium", label: "Media", detail: "Consigliata" },
+                { value: "high", label: "Alta", detail: "Più voci distinte" },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                onClick={() =>
+                  save({
+                    ...settings,
+                    voice_sensitivity: option.value as VoiceSensitivity,
+                  })
+                }
+                className={`flex-1 rounded-lg border px-3 py-2 text-center transition-colors ${
+                  settings.voice_sensitivity === option.value
+                    ? "border-accent bg-accent-soft"
+                    : "border-edge hover:bg-surface-raised"
+                }`}
+              >
+                <span className="block text-xs font-medium">{option.label}</span>
+                <span className="block text-[11px] text-ink-muted">
+                  {option.detail}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <label className="flex items-center gap-3">
+            <span className="text-xs text-ink-muted">
+              Persone attese (0 = decide Brief)
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={8}
+              value={settings.expected_speakers}
+              onChange={(event) =>
+                setLocalSettings({
+                  ...settings,
+                  expected_speakers: Number(event.target.value),
+                })
+              }
+              onBlur={() => save(settings)}
+              className="brief-field w-16 px-2 py-1 text-center text-[13px]"
+            />
+          </label>
         </section>
 
         <section className="space-y-3">

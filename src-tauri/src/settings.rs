@@ -17,6 +17,29 @@ pub enum Quality {
     Accurate,
 }
 
+/// Quanto è facile che due interventi vengano attribuiti alla stessa persona.
+/// Più alta la soglia, più voci distinte vengono create.
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum VoiceSensitivity {
+    /// Poche voci, tende a fondere persone con timbro simile.
+    Low,
+    #[default]
+    Medium,
+    /// Molte voci, tende a spezzare la stessa persona in più gruppi.
+    High,
+}
+
+impl VoiceSensitivity {
+    pub fn threshold(self) -> f32 {
+        match self {
+            VoiceSensitivity::Low => 0.52,
+            VoiceSensitivity::Medium => 0.62,
+            VoiceSensitivity::High => 0.72,
+        }
+    }
+}
+
 /// Taglio del report. `Auto` lascia che sia il modello a riconoscere di che
 /// tipo di conversazione si tratta e ad adattare il documento.
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Default, Debug)]
@@ -55,6 +78,9 @@ pub struct Settings {
     pub report_length: ReportLength,
     /// Istruzioni aggiuntive dell'utente, aggiunte in coda al prompt.
     pub report_notes: String,
+    pub voice_sensitivity: VoiceSensitivity,
+    /// Zero significa «nessun limite noto»: il riconoscimento decide da solo.
+    pub expected_speakers: u32,
 }
 
 impl Default for Settings {
@@ -68,6 +94,8 @@ impl Default for Settings {
             report_style: ReportStyle::default(),
             report_length: ReportLength::default(),
             report_notes: String::new(),
+            voice_sensitivity: VoiceSensitivity::default(),
+            expected_speakers: 0,
         }
     }
 }
