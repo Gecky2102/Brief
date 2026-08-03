@@ -179,7 +179,7 @@ export async function createSession(startedAt: string): Promise<number> {
   const result = await conn.execute(
     `INSERT INTO sessions (title, kind, started_at, duration_ms)
      VALUES ($1, 'unknown', $2, 0)`,
-    ["Registrazione in corso", startedAt],
+    ["Sessione in corso", startedAt],
   );
   return Number(result.lastInsertId ?? 0);
 }

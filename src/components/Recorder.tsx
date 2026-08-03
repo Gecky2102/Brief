@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import LevelMeter from "./LevelMeter";
 import Spinner from "./Spinner";
 import Welcome from "./Welcome";
-import { addSegment, archiveStats, createSession, finishSession } from "../lib/db";
+import { archiveStats, createSession, finishSession } from "../lib/db";
 import { speakerColor } from "./SpeakerBar";
 import {
   compressRecording,
@@ -24,6 +24,8 @@ import {
 
 type Props = {
   onFinished: (sessionId: number) => void;
+  /// Avvisa che una sessione è stata creata, così compare subito in elenco.
+  onStarted: () => void;
 };
 
 type Phase = "idle" | "preparing" | "recording" | "finishing";
@@ -46,7 +48,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1048576).toFixed(0)} MB`;
 }
 
-export default function Recorder({ onFinished }: Props) {
+export default function Recorder({ onFinished, onStarted }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [levels, setLevels] = useState({ mic: 0, system: 0 });
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -96,17 +98,11 @@ export default function Recorder({ onFinished }: Props) {
         setLevels((current) => ({ ...current, [event.track]: event.rms }));
         if (event.rms > 0.015) lastSpeechMs.current = Date.now();
       }),
+      // La scrittura nel database avviene in App, che resta sempre montata:
+      // qui si tiene solo l'anteprima a schermo.
       onSegment((event) => {
         if (event.session_id !== sessionId.current) return;
         setLines((current) => [...current, event]);
-        addSegment({
-          sessionId: event.session_id,
-          track: event.track,
-          startMs: event.start_ms,
-          endMs: event.end_ms,
-          text: event.text,
-          speaker: event.speaker,
-        }).catch(() => undefined);
       }),
       onTranscriptError(setError),
       onImportProgress((event) => {
@@ -195,6 +191,7 @@ export default function Recorder({ onFinished }: Props) {
       const begunAt = new Date();
       const id = await createSession(begunAt.toISOString());
       sessionId.current = id;
+      onStarted();
       await startRecording(id);
       startedAt.current = begunAt;
       lastSpeechMs.current = Date.now();
@@ -253,6 +250,7 @@ export default function Recorder({ onFinished }: Props) {
       const begunAt = new Date();
       const id = await createSession(begunAt.toISOString());
       sessionId.current = id;
+      onStarted();
       const imported = await importAudio(id);
       await finishSession({
         id,

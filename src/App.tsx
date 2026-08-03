@@ -16,9 +16,12 @@ import {
   deleteRecording,
   embedSegments,
   exportMany,
+  onImportProgress,
+  onSegment,
   searchSemantic,
   semanticReady,
 } from "./lib/recorder";
+import { addSegment } from "./lib/db";
 import {
   createFolder,
   deleteFolder,
@@ -86,6 +89,11 @@ export default function App() {
   const [activeFolder, setActiveFolder] = useState<number | null | undefined>(
     undefined,
   );
+  const [liveSessionId, setLiveSessionId] = useState<number | null>(null);
+  const [liveProgress, setLiveProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [semantic, setSemantic] = useState(false);
   const [semanticAvailable, setSemanticAvailable] = useState(false);
   const [indexing, setIndexing] = useState(false);
@@ -142,6 +150,42 @@ export default function App() {
   useEffect(() => {
     semanticReady().then(setSemanticAvailable).catch(() => undefined);
   }, []);
+
+  // L'ascolto sta qui, non nel registratore: quel componente si smonta appena
+  // si cambia vista, e con lui si perdevano tutte le righe successive.
+  useEffect(() => {
+    const sottoscrizioni = [
+      onSegment((event) => {
+        addSegment({
+          sessionId: event.session_id,
+          track: event.track,
+          startMs: event.start_ms,
+          endMs: event.end_ms,
+          text: event.text,
+          speaker: event.speaker,
+        }).catch(() => undefined);
+        setLiveSessionId(event.session_id);
+      }),
+      onImportProgress((event) =>
+        setLiveProgress(
+          event.done_ms >= event.total_ms
+            ? null
+            : { done: event.done_ms, total: event.total_ms },
+        ),
+      ),
+    ];
+    return () => {
+      sottoscrizioni.forEach((s) => s.then((annulla) => annulla()));
+    };
+  }, []);
+
+  // Mentre una sessione è in lavorazione l'elenco si aggiorna da solo, così la
+  // si vede comparire e crescere anche se si sta guardando altro.
+  useEffect(() => {
+    if (liveSessionId === null && liveProgress === null) return;
+    const timer = window.setInterval(refresh, 4000);
+    return () => window.clearInterval(timer);
+  }, [liveSessionId, liveProgress, refresh]);
 
   /// Indicizza a piccoli blocchi le righe non ancora coperte: farlo tutto in
   /// una volta bloccherebbe l'interfaccia su archivi grandi.
@@ -382,6 +426,25 @@ export default function App() {
           </button>
         )}
 
+        {liveProgress && (
+          <div className="mx-3 mb-2 space-y-1 rounded-lg border border-edge bg-surface-raised px-2.5 py-1.5">
+            <div className="flex items-baseline justify-between text-[11px]">
+              <span>Trascrizione in corso</span>
+              <span className="font-mono text-ink-muted">
+                {Math.round((liveProgress.done / Math.max(liveProgress.total, 1)) * 100)}%
+              </span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-surface-sunken">
+              <div
+                className="h-full rounded-full bg-accent transition-[width]"
+                style={{
+                  width: `${Math.round((liveProgress.done / Math.max(liveProgress.total, 1)) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         <nav className="flex-1 overflow-y-auto px-2 pb-2">
           {sessions.length === 0 && (
             <p className="px-3 py-10 text-center text-xs leading-relaxed text-ink-muted">
@@ -482,9 +545,12 @@ export default function App() {
           />
         ) : (
           <Recorder
+            onStarted={refresh}
             onFinished={(sessionId) => {
               refresh();
               setSelectedId(sessionId);
+              setLiveSessionId(null);
+              setLiveProgress(null);
             }}
           />
         )}
