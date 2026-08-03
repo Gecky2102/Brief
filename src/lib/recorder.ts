@@ -129,6 +129,10 @@ export function setApiKey(key: string): Promise<void> {
   return invoke<void>("set_api_key", { key });
 }
 
+export function testProvider(): Promise<string> {
+  return invoke<string>("test_provider");
+}
+
 export function storageReport(): Promise<StorageReport> {
   return invoke<StorageReport>("storage_report");
 }

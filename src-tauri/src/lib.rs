@@ -58,6 +58,7 @@ pub fn run() {
             settings::set_settings,
             settings::has_api_key,
             settings::set_api_key,
+            settings::test_provider,
             models::storage_report,
             models::delete_model
         ])

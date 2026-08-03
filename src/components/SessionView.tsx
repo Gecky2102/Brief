@@ -21,16 +21,22 @@ import {
   type Speaker,
   type SessionKind,
 } from "../lib/db";
+import { REPORT_LENGTHS, REPORT_STYLES } from "../lib/catalog";
 import { fileNameFor, speakerOf, toMarkdown } from "../lib/markdown";
 import {
   analyzeSession,
   audioFile,
+  getSettings,
+  setSettings,
   exportAudio,
   exportMarkdown,
   onAnalysisProgress,
   onDownloadProgress,
   type AnalysisProgress,
   type DownloadProgress,
+  type ReportLength,
+  type ReportStyle,
+  type Settings,
 } from "../lib/recorder";
 
 type Props = {
@@ -52,6 +58,8 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [audioPath, setAudioPath] = useState<string | null>(null);
   const [seekTo, setSeekTo] = useState<number | null>(null);
   const [filter, setFilter] = useState("");
+  const [settings, setLocalSettings] = useState<Settings | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -72,6 +80,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     setConfirmingDelete(false);
     listSegments(session.id).then(setSegments).catch(() => undefined);
     listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
+    getSettings().then(setLocalSettings).catch(() => undefined);
     setAudioPath(null);
     setPlayhead(0);
     if (session.audio_path) {
@@ -93,6 +102,15 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       subscriptions.forEach((s) => s.then((unlisten) => unlisten()));
     };
   }, []);
+
+  /// Il taglio si cambia da qui e vale subito per la rigenerazione: passare
+  /// dalle impostazioni per provare un altro formato era macchinoso.
+  async function cambiaOpzione(patch: Partial<Settings>) {
+    if (!settings) return;
+    const next = { ...settings, ...patch };
+    setLocalSettings(next);
+    await setSettings(next).catch(() => undefined);
+  }
 
   async function runAnalysis() {
     setAnalyzing(true);
@@ -251,6 +269,12 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             )}
           </button>
           <button
+            onClick={() => setShowOptions((aperto) => !aperto)}
+            className="brief-button px-3 py-1.5 text-xs"
+          >
+            Taglio {showOptions ? "▾" : "▸"}
+          </button>
+          <button
             onClick={stampaReport}
             disabled={!analysis?.report}
             className="brief-button px-3 py-1.5 text-xs disabled:opacity-40"
@@ -297,6 +321,51 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             </button>
           )}
         </div>
+
+        {showOptions && settings && (
+          <div className="space-y-2 rounded-xl border border-edge bg-surface-raised/60 p-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {REPORT_STYLES.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() =>
+                    cambiaOpzione({ report_style: option.value as ReportStyle })
+                  }
+                  title={option.detail}
+                  className={`rounded-lg border px-2 py-1.5 text-[11px] transition-colors ${
+                    settings.report_style === option.value
+                      ? "border-accent bg-accent-soft"
+                      : "border-edge hover:bg-surface-sunken"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              {REPORT_LENGTHS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() =>
+                    cambiaOpzione({
+                      report_length: option.value as ReportLength,
+                    })
+                  }
+                  className={`flex-1 rounded-lg border px-2 py-1.5 text-[11px] transition-colors ${
+                    settings.report_length === option.value
+                      ? "border-accent bg-accent-soft"
+                      : "border-edge hover:bg-surface-sunken"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-ink-muted">
+              Premi «Rigenera report» per applicare il nuovo taglio.
+            </p>
+          </div>
+        )}
 
         {download && (
           <div className="space-y-1.5 pt-2">

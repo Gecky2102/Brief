@@ -134,6 +134,39 @@ pub fn set_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
 }
 
 /// Riporta solo se una chiave esiste: il valore non torna mai all'interfaccia.
+/// Manda una richiesta minima al fornitore per dire subito se chiave, modello
+/// e indirizzo funzionano, invece di scoprirlo a fine trascrizione.
+#[tauri::command]
+pub async fn test_provider(app: AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let impostazioni = load(&app);
+        let chiave = api_key(&app);
+
+        let mut risposta = String::new();
+        crate::provider::stream(
+            crate::provider::Request {
+                provider: impostazioni.provider,
+                base_url: &impostazioni.base_url,
+                api_key: &chiave,
+                model: &impostazioni.model,
+                system: "Rispondi con una sola parola: pronto",
+                user: "Sei operativo?",
+                max_tokens: 20,
+                prefill: None,
+            },
+            |delta| risposta.push_str(delta),
+        )?;
+
+        Ok(format!(
+            "{} risponde con «{}»",
+            impostazioni.provider.label(),
+            risposta.trim()
+        ))
+    })
+    .await
+    .map_err(|cause| format!("Prova interrotta: {cause}"))?
+}
+
 #[tauri::command]
 pub fn has_api_key(app: AppHandle) -> bool {
     !api_key(&app).is_empty()

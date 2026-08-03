@@ -8,6 +8,7 @@ import {
   setApiKey,
   setSettings,
   storageReport,
+  testProvider,
   type Provider,
   type Quality,
   type ReportLength,
@@ -77,6 +78,7 @@ export default function SettingsPanel({ onClose }: Props) {
   const [keyDraft, setKeyDraft] = useState("");
   const [storage, setStorage] = useState<StorageReport | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshStorage = useCallback(() => {
@@ -109,6 +111,19 @@ export default function SettingsPanel({ onClose }: Props) {
       setNotice("Chiave salvata nel portachiavi di sistema.");
     } catch (cause: unknown) {
       setError(String(cause));
+    }
+  }
+
+  async function provaConnessione() {
+    setTesting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      setNotice(await testProvider());
+    } catch (cause: unknown) {
+      setError(String(cause));
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -283,6 +298,14 @@ export default function SettingsPanel({ onClose }: Props) {
               cartella dati di Brief.
             </span>
           </label>
+
+          <button
+            onClick={provaConnessione}
+            disabled={testing || !keyPresent}
+            className="brief-button px-3 py-1.5 text-xs disabled:opacity-40"
+          >
+            {testing ? <Spinner label="Prova in corso…" /> : "Prova la connessione"}
+          </button>
         </section>
 
         <section className="space-y-3">

@@ -50,6 +50,7 @@ export default function Recorder({ onFinished }: Props) {
   const [lines, setLines] = useState<SegmentEvent[]>([]);
   const [download, setDownload] = useState<DownloadProgress | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
+  const [analysisReady, setAnalysisReady] = useState(true);
   const [systemWarning, setSystemWarning] = useState<string | null>(null);
   const [importing, setImporting] = useState<{
     done: number;
@@ -69,7 +70,10 @@ export default function Recorder({ onFinished }: Props) {
 
   useEffect(() => {
     modelsStatus()
-      .then((status) => setModelReady(status.transcription))
+      .then((status) => {
+        setModelReady(status.transcription);
+        setAnalysisReady(status.analysis);
+      })
       .catch(() => setModelReady(false));
   }, []);
 
@@ -321,6 +325,12 @@ export default function Recorder({ onFinished }: Props) {
           {recording ? "Barra spaziatrice per fermare" : "Barra spaziatrice per avviare"}
         </p>
 
+        {lines.length > 0 && !recording && !busy && (
+          <span className="text-xs text-ink-muted">
+            {lines.length} {lines.length === 1 ? "riga trascritta" : "righe trascritte"}
+          </span>
+        )}
+
         {!recording && !busy && (
           <button
             onClick={runImport}
@@ -427,6 +437,14 @@ export default function Recorder({ onFinished }: Props) {
           )}
           <div ref={transcriptEnd} />
         </div>
+      )}
+
+      {!analysisReady && phase === "idle" && (
+        <p className="max-w-sm rounded-lg border border-edge bg-surface-raised px-4 py-3 text-center text-xs leading-relaxed text-ink-muted">
+          Per generare i report serve una chiave API: impostala dall'ingranaggio
+          in alto a sinistra. La registrazione e la trascrizione funzionano
+          comunque, e restano sul tuo Mac.
+        </p>
       )}
 
       {systemWarning && (
