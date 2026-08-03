@@ -81,6 +81,7 @@ export default function App() {
   const [hits, setHits] = useState<Record<number, SearchHit>>({});
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -224,17 +225,18 @@ export default function App() {
   // ⌘F porta alla ricerca, Esc la svuota o torna al registratore.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.metaKey && event.key === ",") {
+      if (event.metaKey && event.key === "f") {
+        event.preventDefault();
+        setSearchOpen(true);
+        searchInput.current?.focus();
+        searchInput.current?.select();
+      } else if (event.metaKey && event.key === ",") {
         event.preventDefault();
         setShowSettings(true);
       } else if (event.metaKey && event.key === "n") {
         event.preventDefault();
         setShowSettings(false);
         setSelectedId(null);
-      } else if (event.metaKey && event.key === "f") {
-        event.preventDefault();
-        searchInput.current?.focus();
-        searchInput.current?.select();
       } else if (event.key === "?" && !event.metaKey) {
         const target = event.target as HTMLElement | null;
         if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
@@ -243,12 +245,13 @@ export default function App() {
       } else if (event.key === "Escape") {
         if (showShortcuts) setShowShortcuts(false);
         else if (query) setQuery("");
+        else if (searchOpen) setSearchOpen(false);
         else setSelectedId(null);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [query, showShortcuts]);
+  }, [query, showShortcuts, searchOpen]);
 
   const selected = sessions.find((session) => session.id === selectedId) ?? null;
   const totalMs = sessions.reduce(
@@ -307,8 +310,15 @@ export default function App() {
             <h1 className="text-[13px] font-semibold tracking-tight">Brief</h1>
             <div className="brief-no-drag flex items-center gap-1.5">
               <button
+                onClick={() => setSearchOpen((aperto) => !aperto)}
+                title="Cerca (⌘F)"
+                className="brief-button px-2 py-1 text-xs text-ink-muted hover:text-ink"
+              >
+                ⌕
+              </button>
+              <button
                 onClick={() => setShowSettings(true)}
-                title="Impostazioni"
+                title="Impostazioni (⌘,)"
                 className="brief-button px-2 py-1 text-xs text-ink-muted hover:text-ink"
               >
                 ⚙
@@ -324,44 +334,55 @@ export default function App() {
               </button>
             </div>
           </div>
-          <input
-            ref={searchInput}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={
-              semantic ? "Cerca per significato" : "Cerca nelle trascrizioni"
-            }
-            className="brief-field w-full px-2.5 py-1.5 text-xs"
-          />
+          {searchOpen && (
+            <div className="space-y-1.5">
+              <input
+                ref={searchInput}
+                autoFocus
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setQuery("");
+                    setSearchOpen(false);
+                  }
+                }}
+                placeholder={
+                  semantic ? "Cerca per significato" : "Cerca nelle trascrizioni"
+                }
+                className="brief-field w-full px-2.5 py-1.5 text-xs"
+              />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSemantic((attivo) => !attivo)}
-              disabled={!semanticAvailable}
-              title={
-                semanticAvailable
-                  ? "Trova anche chi ha detto la stessa cosa con parole diverse"
-                  : "Serve indicizzare l'archivio"
-              }
-              className={`rounded-full px-2 py-0.5 text-[11px] transition-colors ${
-                semantic
-                  ? "bg-accent text-white"
-                  : "border border-edge hover:bg-surface-raised"
-              } disabled:opacity-40`}
-            >
-              Per significato
-            </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSemantic((attivo) => !attivo)}
+                  disabled={!semanticAvailable}
+                  title={
+                    semanticAvailable
+                      ? "Trova anche chi ha detto la stessa cosa con parole diverse"
+                      : "Serve indicizzare l'archivio"
+                  }
+                  className={`rounded-full px-2 py-0.5 text-[11px] transition-colors ${
+                    semantic
+                      ? "bg-accent text-white"
+                      : "border border-edge hover:bg-surface-raised"
+                  } disabled:opacity-40`}
+                >
+                  Per significato
+                </button>
 
-            {!semanticAvailable && (
-              <button
-                onClick={indicizza}
-                disabled={indexing}
-                className="text-[11px] text-ink-muted underline underline-offset-2 disabled:opacity-40"
-              >
-                {indexing ? "Indicizzo…" : "Attiva"}
-              </button>
-            )}
-          </div>
+                {!semanticAvailable && (
+                  <button
+                    onClick={indicizza}
+                    disabled={indexing}
+                    className="text-[11px] text-ink-muted underline underline-offset-2 disabled:opacity-40"
+                  >
+                    {indexing ? "Indicizzo…" : "Attiva"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </header>
 
         {folders.length > 0 && (

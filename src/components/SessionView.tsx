@@ -577,7 +577,9 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                 <Spinner />
                 {progress?.phase === "reading"
                   ? `Lettura della trascrizione, parte ${progress.step + 1} di ${progress.steps - 1}`
-                  : "Scrittura del riassunto"}
+                  : progress?.phase === "titling"
+                    ? "Ultimi ritocchi"
+                    : "Scrittura del documento"}
               </span>
               <span className="flex items-center gap-3 font-mono">
                 {progress && progress.words > 0 && (

@@ -40,7 +40,8 @@ pub struct Analysis {
 /// lunga l'analisi dura minuti e senza indicazioni sembra bloccata.
 #[derive(Clone, Serialize)]
 pub struct AnalysisProgress {
-    /// «reading» mentre riassume i blocchi, «writing» durante la sintesi finale.
+    /// «reading» mentre legge i blocchi, «writing» mentre scrive il documento,
+    /// «titling» per la breve chiamata che ne ricava titolo e tipo.
     phase: &'static str,
     step: usize,
     steps: usize,
@@ -650,7 +651,7 @@ fn analyze_blocking(
     if let Ok(header) = session.ask(
         SYSTEM_INTESTAZIONE,
         &report.chars().take(6000).collect::<String>(),
-        "writing",
+        "titling",
         0,
         1,
         200,

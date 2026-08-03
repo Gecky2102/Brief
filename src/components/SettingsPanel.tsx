@@ -229,7 +229,6 @@ export default function SettingsPanel({ onClose }: Props) {
             }
             onBlur={() => save(settings)}
             rows={3}
-            placeholder="Marmi Rossi, EasyCo, Qlik Sense, data warehouse, Conti, Pedrotti"
             className="brief-field w-full resize-none px-3 py-2 text-[13px] leading-relaxed"
           />
           <p className="text-[11px] text-ink-muted">
@@ -362,7 +361,7 @@ export default function SettingsPanel({ onClose }: Props) {
                 setLocalSettings({ ...settings, model: event.target.value })
               }
               onBlur={() => save(settings)}
-              placeholder="oppure scrivi il nome di un altro modello"
+              placeholder=""
               className="brief-field w-full px-3 py-1.5 text-[13px]"
             />
           </div>
@@ -378,7 +377,7 @@ export default function SettingsPanel({ onClose }: Props) {
                   setLocalSettings({ ...settings, base_url: event.target.value })
                 }
                 onBlur={() => save(settings)}
-                placeholder="https://esempio.com/v1"
+                placeholder=""
                 className="brief-field w-full px-3 py-1.5 text-[13px]"
               />
             </label>
@@ -484,7 +483,6 @@ export default function SettingsPanel({ onClose }: Props) {
               }
               onBlur={() => save(settings)}
               rows={2}
-              placeholder="es. dai sempre risalto alle scadenze, oppure scrivi in terza persona"
               className="brief-field w-full resize-none px-3 py-1.5 text-[13px]"
             />
           </label>

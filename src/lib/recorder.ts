@@ -112,7 +112,7 @@ export type StorageReport = {
 };
 
 export type AnalysisProgress = {
-  phase: "reading" | "writing";
+  phase: "reading" | "writing" | "titling";
   step: number;
   steps: number;
   preview: string;
