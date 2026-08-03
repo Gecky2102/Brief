@@ -1,6 +1,7 @@
 mod analysis;
 mod audio;
 mod export;
+mod import;
 mod models;
 mod transcriber;
 
@@ -38,7 +39,8 @@ pub fn run() {
             export::compress_recording,
             export::export_markdown,
             export::export_audio,
-            export::delete_recording
+            export::delete_recording,
+            import::import_audio
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

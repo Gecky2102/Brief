@@ -222,6 +222,60 @@ fn worker(
     }
 }
 
+/// Trascrive un blocco di campioni già acquisiti, tagliandolo sulle pause come
+/// durante la registrazione dal vivo, ed emette gli stessi eventi.
+pub fn transcribe_samples(
+    app: &AppHandle,
+    session_id: i64,
+    track: &'static str,
+    samples: &[f32],
+    model: &std::path::Path,
+) -> Result<(), String> {
+    let context = WhisperContext::new_with_params(model, WhisperContextParameters::default())
+        .map_err(|cause| format!("Modello di trascrizione non caricato: {cause}"))?;
+
+    let window = (SAMPLE_RATE * MAX_SEGMENT_MS / 1000) as usize;
+    let mut offset = 0_usize;
+
+    while offset < samples.len() {
+        let end = (offset + window).min(samples.len());
+        let chunk = &samples[offset..end];
+        let start_ms = (offset as i64) * 1000 / SAMPLE_RATE;
+        let end_ms = (end as i64) * 1000 / SAMPLE_RATE;
+
+        if rms(chunk) >= SILENCE_RMS {
+            match transcribe(&context, chunk) {
+                Ok(text) if !is_noise(&text) => {
+                    let _ = app.emit(
+                        "transcript://segment",
+                        SegmentEvent {
+                            session_id,
+                            track,
+                            start_ms,
+                            end_ms,
+                            text,
+                        },
+                    );
+                }
+                Ok(_) => {}
+                Err(message) => return Err(message),
+            }
+        }
+
+        let _ = app.emit(
+            "import://progress",
+            crate::import::ImportProgress {
+                done_ms: end_ms,
+                total_ms: (samples.len() as i64) * 1000 / SAMPLE_RATE,
+            },
+        );
+
+        offset = end;
+    }
+
+    Ok(())
+}
+
 pub fn is_model_ready(app: &AppHandle) -> bool {
     models::path_if_present(app, &models::WHISPER).is_some()
 }

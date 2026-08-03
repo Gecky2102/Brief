@@ -69,6 +69,26 @@ export function analyzeSession(
   return invoke<Analysis>("analyze_session", { lines });
 }
 
+export type ImportedAudio = {
+  file_name: string;
+  duration_ms: number;
+  directory: string;
+};
+
+export type ImportProgress = { done_ms: number; total_ms: number };
+
+export function importAudio(sessionId: number): Promise<ImportedAudio> {
+  return invoke<ImportedAudio>("import_audio", { sessionId });
+}
+
+export function onImportProgress(
+  handler: (event: ImportProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<ImportProgress>("import://progress", (event) =>
+    handler(event.payload),
+  );
+}
+
 export function compressRecording(directory: string): Promise<void> {
   return invoke<void>("compress_recording", { directory });
 }

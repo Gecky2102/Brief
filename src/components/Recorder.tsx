@@ -5,7 +5,9 @@ import { addSegment, createSession, finishSession } from "../lib/db";
 import { speakerOf } from "../lib/markdown";
 import {
   compressRecording,
+  importAudio,
   modelsStatus,
+  onImportProgress,
   onDownloadProgress,
   onLevel,
   onSegment,
@@ -49,6 +51,9 @@ export default function Recorder({ onFinished }: Props) {
   const [download, setDownload] = useState<DownloadProgress | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [systemWarning, setSystemWarning] = useState<string | null>(null);
+  const [importing, setImporting] = useState<{ done: number; total: number } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const startedAt = useRef<Date | null>(null);
@@ -83,6 +88,9 @@ export default function Recorder({ onFinished }: Props) {
         }).catch(() => undefined);
       }),
       onTranscriptError(setError),
+      onImportProgress((event) =>
+        setImporting({ done: event.done_ms, total: event.total_ms }),
+      ),
       onDownloadProgress((event) => {
         setDownload(event.downloaded >= event.total ? null : event);
       }),
@@ -202,6 +210,33 @@ export default function Recorder({ onFinished }: Props) {
     }
   }
 
+  async function runImport() {
+    setError(null);
+    setLines([]);
+    setImporting({ done: 0, total: 1 });
+    try {
+      const begunAt = new Date();
+      const id = await createSession(begunAt.toISOString());
+      sessionId.current = id;
+      const imported = await importAudio(id);
+      await finishSession({
+        id,
+        title: imported.file_name.replace(/\.[^.]+$/, ""),
+        endedAt: new Date().toISOString(),
+        durationMs: imported.duration_ms,
+        audioPath: imported.directory,
+      });
+      sessionId.current = null;
+      onFinished(id);
+    } catch (cause: unknown) {
+      const message = String(cause);
+      if (!message.includes("Nessun file scelto")) setError(message);
+      sessionId.current = null;
+    } finally {
+      setImporting(null);
+    }
+  }
+
   const waitingForSpeech =
     recording && lines.length === 0 && Date.now() - lastSpeechMs.current < 60000;
 
@@ -240,6 +275,16 @@ export default function Recorder({ onFinished }: Props) {
         <p className="text-xs text-ink-muted">
           {recording ? "Barra spaziatrice per fermare" : "Barra spaziatrice per avviare"}
         </p>
+
+        {!recording && !busy && (
+          <button
+            onClick={runImport}
+            disabled={importing !== null}
+            className="text-xs text-ink-muted underline underline-offset-4 hover:text-ink disabled:opacity-50"
+          >
+            oppure importa un file audio
+          </button>
+        )}
       </div>
 
       {modelReady === false && phase === "idle" && !download && (
@@ -253,6 +298,28 @@ export default function Recorder({ onFinished }: Props) {
         <LevelMeter label="Microfono" rms={levels.mic} active={recording} />
         <LevelMeter label="Sistema" rms={levels.system} active={recording} />
       </div>
+
+      {importing && (
+        <div className="w-full max-w-md space-y-2 rounded-lg border border-edge bg-surface-raised px-4 py-3">
+          <span className="flex items-center gap-2 text-xs">
+            <Spinner />
+            Trascrizione del file in corso
+            {importing.total > 1 && (
+              <span className="ml-auto font-mono text-ink-muted">
+                {Math.round((importing.done / importing.total) * 100)}%
+              </span>
+            )}
+          </span>
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunken">
+            <div
+              className="h-full rounded-full bg-accent transition-[width]"
+              style={{
+                width: `${Math.round((importing.done / Math.max(importing.total, 1)) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {download && (
         <div className="w-full max-w-md space-y-2 rounded-lg border border-edge bg-surface-raised px-4 py-3">
