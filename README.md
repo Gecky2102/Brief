@@ -1,36 +1,53 @@
 # Brief
 
-App desktop macOS per registrare, trascrivere e riassumere conversazioni **interamente in locale**. Nessun audio e nessun testo lascia il Mac.
+App macOS che registra, trascrive e trasforma in documenti le tue conversazioni. La trascrizione avviene **sul tuo Mac**: l'audio non esce mai dal computer.
 
-## Come funziona
+## Cosa fa
 
-- **Due tracce separate** — microfono (tu) e audio di sistema (gli interlocutori), catturate via ScreenCaptureKit. Tenerle distinte dà la diarizzazione senza costi aggiuntivi: ogni riga sa già chi parla.
-- **Trascrizione realtime** — whisper.cpp con Metal. L'audio viene tagliato sulle pause: un segmento si chiude dopo ~600 ms di silenzio, o comunque entro 15 secondi.
-- **Analisi a fine sessione** — Qwen2.5 3B via llama.cpp deduce il tipo di conversazione e produce riassunto, decisioni, cose da fare e domande aperte. Gira dopo lo stop, mai insieme a Whisper: i due modelli non convivono in memoria.
-- **Archivio ricercabile** — SQLite con FTS5. Ricerca full-text su tutte le trascrizioni, export in Markdown, audio compresso in AAC ed esportabile.
+**Registra due tracce separate** — microfono e audio di sistema, catturate via ScreenCaptureKit senza driver da installare. Tenerle distinte permette di sapere già chi parla.
+
+**Riconosce le voci** — un modello di impronta vocale raggruppa gli interventi per persona. Puoi dare un nome a ciascuna voce, unirne due quando la stessa persona è stata divisa, e regolare quanto il riconoscimento è sensibile.
+
+**Trascrive in italiano mentre parli** — whisper.cpp con Metal, tagliando sulle pause. Ogni finestra riceve il contesto della precedente, così i nomi propri restano coerenti.
+
+**Scrive un documento, non un riassunto** — da 600 a 6000 parole a seconda di quanto lo vuoi esteso, con otto tagli diversi: riunione, sintesi direzionale, verbale, lezione, intervista, punto di avanzamento, brainstorming, oppure riconosciuto automaticamente.
+
+**Archivia e ritrova** — SQLite con ricerca full-text che mostra il punto in cui compare il termine. Esporti in Markdown, PDF o audio, singolarmente o in blocco.
+
+**Riascolti mentre leggi** — clicchi il minutaggio di una riga e senti quel punto della registrazione.
+
+## Dove finiscono i dati
+
+Tutto in `~/Library/Application Support/it.gmasiero.brief/`: database, registrazioni in AAC, modelli scaricati e la chiave del servizio di analisi (in un file leggibile solo dal tuo utente).
+
+L'unica cosa che esce dal Mac è il **testo** della trascrizione, inviato al servizio che scegli per scrivere il report: Anthropic, OpenAI, Google, OpenRouter o qualsiasi servizio compatibile con l'interfaccia di OpenAI.
 
 ## Modelli
 
-Non sono nel bundle. Vengono scaricati al primo uso in `~/Library/Application Support/it.gmasiero.brief/models/` e **verificati contro l'hash SHA-256 pubblicato**: un download troncato o manomesso viene scartato.
+Scaricati al primo uso e verificati contro l'hash SHA-256 pubblicato. I download interrotti riprendono da dove erano rimasti.
 
 | | File | Peso |
 |---|---|---|
-| Trascrizione | `ggml-small-q5_1.bin` | 190 MB |
-| Analisi | `qwen2.5-3b-instruct-q4_k_m.gguf` | 2,1 GB |
+| Trascrizione veloce | `ggml-small-q5_1.bin` | 190 MB |
+| Trascrizione accurata | `ggml-large-v3-turbo-q5_0.bin` | 574 MB |
+| Riconoscimento voci | `wespeaker-resnet34.onnx` | 27 MB |
 
-## Stato
+## Scorciatoie
 
-Trascrizione, cattura audio e analisi sono state verificate end-to-end. I test unitari girano con `cargo test`; quelli che richiedono i modelli scaricati sono marcati `#[ignore]`:
-
-```bash
-cargo test                                    # 7 test unitari
-BRIEF_TEST_WAV=… BRIEF_TEST_MODEL=… \
-BRIEF_TEST_LLM=… cargo test -- --ignored      # trascrizione e analisi reali
-```
+| | |
+|---|---|
+| Spazio | Avvia o ferma la registrazione |
+| ⌘N | Nuova sessione |
+| ⌘F | Cerca |
+| ⌘R | Genera o rigenera il report |
+| ⌘P | Esporta in PDF |
+| ⌘⇧C | Copia negli appunti |
+| ⌘, | Impostazioni |
+| ? | Elenco delle scorciatoie |
 
 ## Requisiti
 
-macOS 13+ su Apple Silicon. Al primo avvio l'app chiede **microfono** e **registrazione schermo** (quest'ultimo è il permesso che macOS richiede per catturare l'audio di sistema). Dopo aver concesso la registrazione schermo l'app va riavviata: lo impone il sistema.
+macOS 13+ su Apple Silicon. Al primo avvio l'app chiede **microfono** e **registrazione schermo** — quest'ultimo è il permesso che macOS richiede per catturare l'audio di sistema. Dopo averlo concesso l'app va riavviata: lo impone il sistema.
 
 ## Sviluppo
 
@@ -38,16 +55,7 @@ macOS 13+ su Apple Silicon. Al primo avvio l'app chiede **microfono** e **regist
 npm install
 npm run tauri dev     # sviluppo
 npm run tauri build   # genera Brief.app e il .dmg
+cargo test            # test unitari
 ```
 
-Serve la toolchain Rust, gli Xcode Command Line Tools e `cmake` (`brew install cmake`) per compilare whisper.cpp e llama.cpp.
-
-## Dati
-
-Tutto sotto `~/Library/Application Support/it.gmasiero.brief/`:
-
-```
-brief.db                  sessioni, trascrizioni, analisi
-recordings/<timestamp>/   mic.m4a, system.m4a
-models/                   modelli scaricati
-```
+Serve la toolchain Rust, gli Xcode Command Line Tools e `cmake` per compilare whisper.cpp.
