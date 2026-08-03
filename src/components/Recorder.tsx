@@ -4,6 +4,7 @@ import Spinner from "./Spinner";
 import Welcome from "./Welcome";
 import { addSegment, archiveStats, createSession, finishSession } from "../lib/db";
 import { speakerOf } from "../lib/markdown";
+import { speakerColor } from "./SpeakerBar";
 import {
   compressRecording,
   getSettings,
@@ -439,19 +440,38 @@ export default function Recorder({ onFinished }: Props) {
 
       {(lines.length > 0 || recording) && (
         <div className="w-full max-w-2xl flex-1 space-y-3 rounded-xl border border-edge bg-surface-sunken/60 p-5">
-          {lines.map((line, index) => (
-            <p key={index} className="brief-rise text-sm leading-relaxed">
-              <span
-                className={`mr-2 text-xs font-medium ${
-                  line.track === "mic" ? "text-accent" : "text-ink-muted"
-                }`}
-              >
-                {speakerOf(line.track)}
-                {line.speaker !== null && line.track !== "mic" && ` ${line.speaker + 1}`}
-              </span>
-              {line.text}
-            </p>
-          ))}
+          {lines.map((line, index) => {
+            const precedente = lines[index - 1];
+            const stessaVoce =
+              precedente &&
+              precedente.track === line.track &&
+              precedente.speaker === line.speaker;
+
+            return (
+              <p key={index} className="brief-rise text-sm leading-relaxed">
+                {!stessaVoce && (
+                  <span
+                    className="mr-2 text-xs font-medium"
+                    style={{
+                      color:
+                        line.track === "mic"
+                          ? "var(--accent)"
+                          : line.speaker !== null
+                            ? speakerColor(line.speaker)
+                            : "var(--ink-muted)",
+                    }}
+                  >
+                    {line.track === "mic"
+                      ? "Io"
+                      : line.speaker !== null
+                        ? `Voce ${line.speaker + 1}`
+                        : "Interlocutore"}
+                  </span>
+                )}
+                {line.text}
+              </p>
+            );
+          })}
 
           {recording && (
             <div className="space-y-2 pt-1">
@@ -466,6 +486,30 @@ export default function Recorder({ onFinished }: Props) {
           )}
           <div ref={transcriptEnd} />
         </div>
+      )}
+
+      {lines.length > 0 && !recording && !busy && (
+        <button
+          onClick={() =>
+            navigator.clipboard.writeText(
+              lines
+                .map(
+                  (line) =>
+                    `${
+                      line.track === "mic"
+                        ? "Io"
+                        : line.speaker !== null
+                          ? `Voce ${line.speaker + 1}`
+                          : "Interlocutore"
+                    }: ${line.text}`,
+                )
+                .join("\n"),
+            )
+          }
+          className="brief-button px-3 py-1.5 text-xs"
+        >
+          Copia la trascrizione
+        </button>
       )}
 
       {!analysisReady && phase === "idle" && settings && !dismissedWelcome && (
