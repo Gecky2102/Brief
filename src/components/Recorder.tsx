@@ -3,7 +3,6 @@ import LevelMeter from "./LevelMeter";
 import Spinner from "./Spinner";
 import Welcome from "./Welcome";
 import { addSegment, archiveStats, createSession, finishSession } from "../lib/db";
-import { speakerOf } from "../lib/markdown";
 import { speakerColor } from "./SpeakerBar";
 import {
   compressRecording,
