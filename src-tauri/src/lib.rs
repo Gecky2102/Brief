@@ -72,6 +72,7 @@ pub fn run() {
             export::compress_recording,
             export::export_markdown,
             export::export_many,
+            export::export_pdf,
             export::export_audio,
             export::delete_recording,
             export::audio_file,

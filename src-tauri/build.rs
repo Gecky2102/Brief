@@ -9,10 +9,12 @@ use std::process::Command;
 fn build_swift_capture() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let source = manifest.join("swift/BriefCapture.swift");
+    let pdf_source = manifest.join("swift/BriefPdf.swift");
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let library = out_dir.join("libbriefcapture.a");
 
     println!("cargo:rerun-if-changed={}", source.display());
+    println!("cargo:rerun-if-changed={}", pdf_source.display());
 
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".into());
     let optimization = if profile == "release" { "-O" } else { "-Onone" };
@@ -31,6 +33,7 @@ fn build_swift_capture() {
         .arg("-o")
         .arg(&library)
         .arg(&source)
+        .arg(&pdf_source)
         .status()
         .expect("swiftc non disponibile: installa gli Xcode Command Line Tools");
 
@@ -51,6 +54,7 @@ fn build_swift_capture() {
         "CoreAudio",
         "AudioToolbox",
         "Foundation",
+        "WebKit",
     ] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }

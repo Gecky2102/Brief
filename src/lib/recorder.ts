@@ -252,6 +252,10 @@ export function exportMany(files: [string, string][]): Promise<number> {
   return invoke<number>("export_many", { files });
 }
 
+export function exportPdf(fileName: string, html: string): Promise<boolean> {
+  return invoke<boolean>("export_pdf", { fileName, html });
+}
+
 export function exportAudio(directory: string): Promise<boolean> {
   return invoke<boolean>("export_audio", { directory });
 }

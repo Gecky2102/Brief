@@ -1,8 +1,15 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use std::ffi::CString;
+use std::os::raw::c_char;
+
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
+
+extern "C" {
+    fn brief_html_to_pdf(html: *const c_char, output: *const c_char) -> i32;
+}
 
 /// `afconvert` fa parte di macOS: comprimere in AAC riduce un'ora di parlato da
 /// ~110 MB di WAV a ~28 MB, e i WAV a 16 kHz servivano solo alla trascrizione.
@@ -140,6 +147,61 @@ fn export_markdown_blocking(
     std::fs::write(&path, contents)
         .map_err(|cause| format!("Impossibile scrivere il file: {cause}"))?;
     Ok(true)
+}
+
+/// Salva il documento come PDF. L'HTML arriva già impaginato dall'interfaccia
+/// e viene reso da WebKit, che rispetta tabelle e interruzioni di pagina.
+#[tauri::command]
+pub async fn export_pdf(
+    app: AppHandle,
+    file_name: String,
+    html: String,
+) -> Result<bool, String> {
+    let target = {
+        let app = app.clone();
+        let nome = file_name.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let sicuro: String = nome
+                .chars()
+                .filter(|c| !matches!(c, '/' | '\\' | ':'))
+                .collect();
+            app.dialog()
+                .file()
+                .set_file_name(&sicuro)
+                .add_filter("PDF", &["pdf"])
+                .blocking_save_file()
+        })
+        .await
+        .map_err(|cause| format!("Esportazione interrotta: {cause}"))?
+    };
+
+    let Some(target) = target else { return Ok(false) };
+    let path = target
+        .into_path()
+        .map_err(|cause| format!("Percorso non valido: {cause}"))?;
+
+    let html = CString::new(html).map_err(|_| "Documento non valido.".to_string())?;
+    let destinazione = CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|_| "Percorso non valido.".to_string())?;
+
+    // WebKit pretende il thread principale: eseguirlo altrove non produce nulla.
+    let (mittente, ricevente) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let esito = unsafe { brief_html_to_pdf(html.as_ptr(), destinazione.as_ptr()) };
+        let _ = mittente.send(esito);
+    })
+    .map_err(|cause| format!("Esportazione non avviata: {cause}"))?;
+
+    let esito = ricevente
+        .recv_timeout(std::time::Duration::from_secs(60))
+        .map_err(|_| "La creazione del PDF non si è conclusa.".to_string())?;
+
+    match esito {
+        0 => Ok(true),
+        2 => Err("Impossibile scrivere il PDF su disco.".into()),
+        5 => Err("Richiesto macOS 11 o successivo.".into()),
+        _ => Err("Creazione del PDF non riuscita.".into()),
+    }
 }
 
 #[tauri::command]

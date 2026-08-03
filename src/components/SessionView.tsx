@@ -26,7 +26,9 @@ import {
   type Speaker,
   type SessionKind,
 } from "../lib/db";
+import { marked } from "marked";
 import { REPORT_LENGTHS, REPORT_STYLES } from "../lib/catalog";
+import { toPrintableHtml } from "../lib/printable";
 import { fileNameFor, speakerOf, toMarkdown } from "../lib/markdown";
 import {
   analyzeSession,
@@ -36,6 +38,7 @@ import {
   setSettings,
   exportAudio,
   exportMarkdown,
+  exportPdf,
   onAnalysisProgress,
   onDownloadProgress,
   type AnalysisEstimate,
@@ -303,10 +306,23 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     onChanged();
   }
 
-  function stampaReport() {
-    // La stampa di sistema di macOS offre «Salva come PDF»: è il modo più
-    // diretto per avere il documento impaginato senza un motore PDF a bordo.
-    window.print();
+  async function stampaReport() {
+    if (!analysis?.report) return;
+    setError(null);
+    try {
+      // Il PDF viene reso da WebKit lato Rust: le webview di Tauri non
+      // supportano la stampa del browser.
+      const html = toPrintableHtml({ ...session, title }, analysis, (md) =>
+        marked.parse(md, { async: false }) as string,
+      );
+      const salvato = await exportPdf(
+        fileNameFor(session).replace(/\.md$/, ".pdf"),
+        html,
+      );
+      if (salvato) setNotice("Documento esportato in PDF.");
+    } catch (cause: unknown) {
+      setError(String(cause));
+    }
   }
 
   async function saveMarkdown() {
