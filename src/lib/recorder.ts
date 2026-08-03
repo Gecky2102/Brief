@@ -190,6 +190,10 @@ export function exportAudio(directory: string): Promise<boolean> {
   return invoke<boolean>("export_audio", { directory });
 }
 
+export function audioFile(directory: string): Promise<string | null> {
+  return invoke<string | null>("audio_file", { directory });
+}
+
 export function deleteRecording(directory: string): Promise<void> {
   return invoke<void>("delete_recording", { directory });
 }

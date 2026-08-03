@@ -52,6 +52,7 @@ pub fn run() {
             export::export_markdown,
             export::export_audio,
             export::delete_recording,
+            export::audio_file,
             import::import_audio,
             settings::get_settings,
             settings::set_settings,

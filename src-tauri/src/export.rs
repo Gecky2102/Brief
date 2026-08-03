@@ -148,6 +148,25 @@ fn export_audio_blocking(app: AppHandle, directory: String) -> Result<bool, Stri
     Ok(true)
 }
 
+/// Percorso del file audio di una sessione, se esiste. Serve all'interfaccia
+/// per riprodurlo mentre si legge la trascrizione.
+#[tauri::command]
+pub fn audio_file(app: AppHandle, directory: String) -> Result<Option<String>, String> {
+    let source = session_directory(&app, &directory)?;
+
+    // La traccia di sistema contiene gli interlocutori: è quella che serve
+    // riascoltare per verificare una parola dubbia.
+    for track in ["system", "mic"] {
+        for extension in ["m4a", "wav"] {
+            let file = source.join(format!("{track}.{extension}"));
+            if file.exists() {
+                return Ok(Some(file.to_string_lossy().into_owned()));
+            }
+        }
+    }
+    Ok(None)
+}
+
 #[tauri::command]
 pub fn delete_recording(app: AppHandle, directory: String) -> Result<(), String> {
     let directory = session_directory(&app, &directory)?;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import Spinner from "./Spinner";
 import ReportView from "./ReportView";
 import SpeakerBar, { speakerColor } from "./SpeakerBar";
+import AudioPlayer from "./AudioPlayer";
 import {
   KIND_LABELS,
   listSegments,
@@ -22,6 +23,7 @@ import {
 import { fileNameFor, speakerOf, toMarkdown } from "../lib/markdown";
 import {
   analyzeSession,
+  audioFile,
   exportAudio,
   exportMarkdown,
   onAnalysisProgress,
@@ -46,6 +48,9 @@ function formatStamp(ms: number): string {
 export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
+  const [audioPath, setAudioPath] = useState<string | null>(null);
+  const [seekTo, setSeekTo] = useState<number | null>(null);
+  const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [download, setDownload] = useState<DownloadProgress | null>(null);
@@ -65,6 +70,11 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     setConfirmingDelete(false);
     listSegments(session.id).then(setSegments).catch(() => undefined);
     listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
+    setAudioPath(null);
+    setPlayhead(0);
+    if (session.audio_path) {
+      audioFile(session.audio_path).then(setAudioPath).catch(() => undefined);
+    }
     loadAnalysis(session.id).then(setAnalysis).catch(() => undefined);
   }, [session.id, session.title]);
 
@@ -377,6 +387,14 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             onRename={rinomina}
             onMerge={unisci}
           />
+
+          {audioPath && (
+            <AudioPlayer
+              path={audioPath}
+              seekTo={seekTo}
+              onTime={setPlayhead}
+            />
+          )}
           {segments.length === 0 ? (
             <p className="text-sm text-ink-muted">
               Nessun parlato riconosciuto in questa sessione.
@@ -385,11 +403,20 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             segments.map((segment) => (
               <div
                 key={segment.id}
-                className="group flex gap-3 rounded-md px-2 py-1 -mx-2 hover:bg-surface-raised/50"
+                className={`group -mx-2 flex gap-3 rounded-md px-2 py-1 transition-colors ${
+                  playhead >= segment.start_ms && playhead < segment.end_ms
+                    ? "bg-accent-soft"
+                    : "hover:bg-surface-raised/50"
+                }`}
               >
-                <span className="shrink-0 pt-0.5 font-mono text-xs text-ink-muted">
+                <button
+                  onClick={() => setSeekTo(segment.start_ms)}
+                  title="Ascolta da qui"
+                  disabled={!audioPath}
+                  className="shrink-0 pt-0.5 font-mono text-xs text-ink-muted hover:text-accent disabled:hover:text-ink-muted"
+                >
                   {formatStamp(segment.start_ms)}
-                </span>
+                </button>
                 <span
                   className="flex w-28 shrink-0 items-center gap-1.5 pt-0.5 text-xs font-medium"
                   style={{
