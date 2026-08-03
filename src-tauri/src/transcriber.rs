@@ -294,3 +294,41 @@ mod tests {
         assert!((rms(&[1.0, -1.0]) - 1.0).abs() < f32::EPSILON);
     }
 }
+
+/// Test end-to-end della trascrizione. Richiede il modello scaricato, quindi
+/// resta fuori dalla corsa normale:
+/// `BRIEF_TEST_WAV=... BRIEF_TEST_MODEL=... cargo test -- --ignored`
+#[cfg(test)]
+mod integration {
+    use super::*;
+
+    fn read_wav_mono16(path: &str) -> Vec<f32> {
+        let bytes = std::fs::read(path).expect("wav leggibile");
+        // I campioni iniziano dopo l'header canonico di 44 byte.
+        bytes[44..]
+            .chunks_exact(2)
+            .map(|pair| i16::from_le_bytes([pair[0], pair[1]]) as f32 / 32768.0)
+            .collect()
+    }
+
+    #[test]
+    #[ignore]
+    fn trascrive_parlato_italiano() {
+        let wav = std::env::var("BRIEF_TEST_WAV").expect("BRIEF_TEST_WAV");
+        let model = std::env::var("BRIEF_TEST_MODEL").expect("BRIEF_TEST_MODEL");
+
+        let context =
+            WhisperContext::new_with_params(&model, WhisperContextParameters::default())
+                .expect("modello caricato");
+
+        let text = transcribe(&context, &read_wav_mono16(&wav)).expect("trascrizione");
+        println!("TRASCRITTO: {text}");
+
+        assert!(!is_noise(&text), "la trascrizione è stata scartata come rumore");
+        let lowercase = text.to_lowercase();
+        assert!(
+            lowercase.contains("domani") || lowercase.contains("preventivo"),
+            "testo inatteso: {text}"
+        );
+    }
+}
