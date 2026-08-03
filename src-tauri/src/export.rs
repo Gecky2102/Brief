@@ -49,7 +49,13 @@ fn session_directory(app: &AppHandle, directory: &str) -> Result<PathBuf, String
 }
 
 #[tauri::command]
-pub fn compress_recording(app: AppHandle, directory: String) -> Result<(), String> {
+pub async fn compress_recording(app: AppHandle, directory: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || compress_blocking(app, directory))
+        .await
+        .map_err(|cause| format!("Compressione interrotta: {cause}"))?
+}
+
+fn compress_blocking(app: AppHandle, directory: String) -> Result<(), String> {
     let directory = session_directory(&app, &directory)?;
 
     for track in ["mic", "system"] {
@@ -65,7 +71,21 @@ pub fn compress_recording(app: AppHandle, directory: String) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub fn export_markdown(app: AppHandle, file_name: String, contents: String) -> Result<bool, String> {
+pub async fn export_markdown(
+    app: AppHandle,
+    file_name: String,
+    contents: String,
+) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || export_markdown_blocking(app, file_name, contents))
+        .await
+        .map_err(|cause| format!("Esportazione interrotta: {cause}"))?
+}
+
+fn export_markdown_blocking(
+    app: AppHandle,
+    file_name: String,
+    contents: String,
+) -> Result<bool, String> {
     let safe_name = file_name
         .chars()
         .filter(|c| !matches!(c, '/' | '\\' | ':'))
@@ -89,7 +109,13 @@ pub fn export_markdown(app: AppHandle, file_name: String, contents: String) -> R
 }
 
 #[tauri::command]
-pub fn export_audio(app: AppHandle, directory: String) -> Result<bool, String> {
+pub async fn export_audio(app: AppHandle, directory: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || export_audio_blocking(app, directory))
+        .await
+        .map_err(|cause| format!("Esportazione interrotta: {cause}"))?
+}
+
+fn export_audio_blocking(app: AppHandle, directory: String) -> Result<bool, String> {
     let source = session_directory(&app, &directory)?;
 
     let target = app.dialog().file().blocking_pick_folder();

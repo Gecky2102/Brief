@@ -191,7 +191,16 @@ fn render_transcript(lines: &[TranscriptLine]) -> String {
 }
 
 #[tauri::command]
-pub fn analyze_session(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analysis, String> {
+pub async fn analyze_session(
+    app: AppHandle,
+    lines: Vec<TranscriptLine>,
+) -> Result<Analysis, String> {
+    tauri::async_runtime::spawn_blocking(move || analyze_blocking(app, lines))
+        .await
+        .map_err(|cause| format!("Analisi interrotta: {cause}"))?
+}
+
+fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analysis, String> {
     if lines.is_empty() {
         return Err("Non c'è nulla da analizzare: la trascrizione è vuota.".into());
     }

@@ -125,7 +125,16 @@ fn recordings_root(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn start_recording(app: AppHandle, session_id: i64) -> Result<StartedRecording, String> {
+pub async fn start_recording(
+    app: AppHandle,
+    session_id: i64,
+) -> Result<StartedRecording, String> {
+    tauri::async_runtime::spawn_blocking(move || start_blocking(app, session_id))
+        .await
+        .map_err(|cause| format!("Avvio interrotto: {cause}"))?
+}
+
+fn start_blocking(app: AppHandle, session_id: i64) -> Result<StartedRecording, String> {
     let started_at_ms = epoch_millis();
     let directory = recordings_root(&app)?.join(started_at_ms.to_string());
     std::fs::create_dir_all(&directory)
@@ -155,7 +164,13 @@ pub fn start_recording(app: AppHandle, session_id: i64) -> Result<StartedRecordi
 }
 
 #[tauri::command]
-pub fn stop_recording() -> Result<FinishedRecording, String> {
+pub async fn stop_recording() -> Result<FinishedRecording, String> {
+    tauri::async_runtime::spawn_blocking(stop_blocking)
+        .await
+        .map_err(|cause| format!("Arresto interrotto: {cause}"))?
+}
+
+fn stop_blocking() -> Result<FinishedRecording, String> {
     let duration_ms = unsafe { brief_capture_stop() };
     hide_recording_indicator();
     crate::transcriber::stop();

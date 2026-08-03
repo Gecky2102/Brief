@@ -49,8 +49,18 @@ pub struct ImportedAudio {
 
 /// Importa un file audio, lo trascrive per intero e ne emette i segmenti con
 /// gli stessi eventi della registrazione dal vivo.
+///
+/// Il comando è `async` e il lavoro vero sta su un thread dedicato: i comandi
+/// sincroni di Tauri girano sul thread principale, dove un pannello file
+/// bloccante manda l'app in stallo e la trascrizione congelerebbe l'interfaccia.
 #[tauri::command]
-pub fn import_audio(app: AppHandle, session_id: i64) -> Result<ImportedAudio, String> {
+pub async fn import_audio(app: AppHandle, session_id: i64) -> Result<ImportedAudio, String> {
+    tauri::async_runtime::spawn_blocking(move || import_blocking(app, session_id))
+        .await
+        .map_err(|cause| format!("Importazione interrotta: {cause}"))?
+}
+
+fn import_blocking(app: AppHandle, session_id: i64) -> Result<ImportedAudio, String> {
     let picked = app
         .dialog()
         .file()
