@@ -18,6 +18,16 @@ Non sono nel bundle. Vengono scaricati al primo uso in `~/Library/Application Su
 | Trascrizione | `ggml-small-q5_1.bin` | 190 MB |
 | Analisi | `qwen2.5-3b-instruct-q4_k_m.gguf` | 2,1 GB |
 
+## Stato
+
+Trascrizione, cattura audio e analisi sono state verificate end-to-end. I test unitari girano con `cargo test`; quelli che richiedono i modelli scaricati sono marcati `#[ignore]`:
+
+```bash
+cargo test                                    # 7 test unitari
+BRIEF_TEST_WAV=… BRIEF_TEST_MODEL=… \
+BRIEF_TEST_LLM=… cargo test -- --ignored      # trascrizione e analisi reali
+```
+
 ## Requisiti
 
 macOS 13+ su Apple Silicon. Al primo avvio l'app chiede **microfono** e **registrazione schermo** (quest'ultimo è il permesso che macOS richiede per catturare l'audio di sistema). Dopo aver concesso la registrazione schermo l'app va riavviata: lo impone il sistema.
