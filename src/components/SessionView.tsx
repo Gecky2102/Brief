@@ -151,6 +151,17 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     }
   }
 
+  async function copyToClipboard() {
+    setError(null);
+    try {
+      const contents = toMarkdown({ ...session, title }, segments, analysis);
+      await navigator.clipboard.writeText(contents);
+      setNotice("Copiato negli appunti.");
+    } catch {
+      setError("Copia negli appunti non riuscita.");
+    }
+  }
+
   async function saveAudio() {
     setError(null);
     if (!session.audio_path) {
@@ -205,6 +216,12 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             ) : (
               "Analizza sessione"
             )}
+          </button>
+          <button
+            onClick={copyToClipboard}
+            className="rounded-md border border-edge px-3 py-1.5 text-xs hover:bg-surface-raised"
+          >
+            Copia
           </button>
           <button
             onClick={saveMarkdown}
