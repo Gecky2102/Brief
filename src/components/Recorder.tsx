@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import LevelMeter from "./LevelMeter";
 import Spinner from "./Spinner";
+import Welcome from "./Welcome";
 import { addSegment, createSession, finishSession } from "../lib/db";
 import { speakerOf } from "../lib/markdown";
 import {
   compressRecording,
+  getSettings,
   importAudio,
   modelsStatus,
   onImportProgress,
@@ -17,6 +19,7 @@ import {
   systemTrackHealth,
   type DownloadProgress,
   type SegmentEvent,
+  type Settings,
 } from "../lib/recorder";
 
 type Props = {
@@ -51,6 +54,8 @@ export default function Recorder({ onFinished }: Props) {
   const [download, setDownload] = useState<DownloadProgress | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [analysisReady, setAnalysisReady] = useState(true);
+  const [settings, setLocalSettings] = useState<Settings | null>(null);
+  const [dismissedWelcome, setDismissedWelcome] = useState(false);
   const [systemWarning, setSystemWarning] = useState<string | null>(null);
   const [importing, setImporting] = useState<{
     done: number;
@@ -75,6 +80,7 @@ export default function Recorder({ onFinished }: Props) {
         setAnalysisReady(status.analysis);
       })
       .catch(() => setModelReady(false));
+    getSettings().then(setLocalSettings).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -439,12 +445,16 @@ export default function Recorder({ onFinished }: Props) {
         </div>
       )}
 
-      {!analysisReady && phase === "idle" && (
-        <p className="max-w-sm rounded-lg border border-edge bg-surface-raised px-4 py-3 text-center text-xs leading-relaxed text-ink-muted">
-          Per generare i report serve una chiave API: impostala dall'ingranaggio
-          in alto a sinistra. La registrazione e la trascrizione funzionano
-          comunque, e restano sul tuo Mac.
-        </p>
+      {!analysisReady && phase === "idle" && settings && !dismissedWelcome && (
+        <Welcome
+          settings={settings}
+          onDone={() => {
+            setDismissedWelcome(true);
+            modelsStatus()
+              .then((status) => setAnalysisReady(status.analysis))
+              .catch(() => undefined);
+          }}
+        />
       )}
 
       {systemWarning && (
