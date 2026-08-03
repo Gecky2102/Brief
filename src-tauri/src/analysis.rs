@@ -43,19 +43,19 @@ pub struct AnalysisProgress {
 fn struttura(style: settings::ReportStyle) -> &'static str {
     use settings::ReportStyle::*;
     match style {
-        Auto | Meeting => "## Quadro generale\nContesto, partecipanti con i nomi che compaiono, scopo dell'incontro, come si è svolto.\n\n## <un titolo per ciascun tema affrontato>\nUna sezione per ogni argomento di sostanza, in ordine di importanza. Spiega il problema, le posizioni emerse, i dettagli tecnici, i numeri, i sistemi e gli strumenti citati. Usa sottosezioni, elenchi e tabelle dove aiutano.\n\n## Decisioni prese\nTabella | Decisione | Motivazione | Chi decide |\n\n## Attivita da svolgere\nTabella | Attivita | Responsabile | Scadenza |\n\n## Punti aperti\nQuestioni irrisolte, ciascuna con una riga di contesto.\n\n## Rischi e criticita\nOstacoli, dipendenze e problemi segnalati.",
+        Auto | Meeting => "Apri con un titolo di primo livello che nomini l'oggetto concreto della riunione.\nPoi, nell'ordine:\n- una sezione «Quadro generale» con contesto, partecipanti nominati, scopo e svolgimento;\n- una sezione per ciascun tema affrontato, intitolata con il tema stesso, in ordine di importanza, che spieghi il problema, le posizioni emerse, i dettagli tecnici, i numeri e i sistemi citati;\n- «Decisioni prese», tabella con colonne Decisione, Motivazione, Chi decide;\n- «Attivita da svolgere», tabella con colonne Attivita, Responsabile, Scadenza;\n- «Punti aperti», elenco delle questioni irrisolte con una riga di contesto ciascuna;\n- «Rischi e criticita», ostacoli e dipendenze segnalati.",
 
-        Executive => "## In sintesi\nCinque righe che dicono l'essenziale a chi ha due minuti.\n\n## Situazione\nContesto e problema di fondo, senza tecnicismi.\n\n## Decisioni e implicazioni\nTabella | Decisione | Impatto | Chi decide |\n\n## Cosa serve ora\nTabella | Azione | Responsabile | Entro quando |\n\n## Rischi\nI tre o quattro rischi che contano davvero, con la loro gravita.\n\n## Approfondimento\nIl dettaglio per chi vuole andare a fondo, organizzato per tema.",
+        Executive => "Apri con un titolo di primo livello che nomini l'oggetto concreto della discussione.\nPoi: «In sintesi» con l'essenziale in cinque righe; «Situazione» con contesto e problema di fondo senza tecnicismi; «Decisioni e implicazioni» come tabella con colonne Decisione, Impatto, Chi decide; «Cosa serve ora» come tabella con colonne Azione, Responsabile, Entro quando; «Rischi» con i tre o quattro che contano davvero e la loro gravita; «Approfondimento» con il dettaglio per tema.",
 
-        Lecture => "## Argomento della lezione\nDi cosa tratta e come si inserisce nel percorso.\n\n## <un titolo per ciascun concetto spiegato>\nUna sezione per concetto: definizione, spiegazione distesa, esempi fatti a lezione, formule o passaggi se ci sono.\n\n## Definizioni\nTabella | Termine | Significato |\n\n## Esempi ed esercizi\nGli esempi svolti, con il ragionamento seguito.\n\n## Da studiare\nCosa e stato assegnato o consigliato.\n\n## Punti da chiarire\nCio che e rimasto oscuro o e stato rimandato.",
+        Lecture => "Apri con un titolo di primo livello che nomini l'argomento della lezione.\nPoi: «Argomento della lezione» con inquadramento; una sezione per ciascun concetto spiegato, intitolata col concetto stesso, con definizione, spiegazione distesa ed esempi svolti a lezione; «Definizioni» come tabella con colonne Termine, Significato; «Esempi ed esercizi» con il ragionamento seguito; «Da studiare» con quanto assegnato; «Punti da chiarire» con cio che e rimasto in sospeso.",
 
-        Interview => "## Profilo\nChi e l'intervistato, ruolo, contesto dell'intervista.\n\n## <un titolo per ciascun tema toccato>\nUna sezione per tema, con le posizioni espresse e le motivazioni addotte. Riporta fra virgolette i passaggi piu significativi.\n\n## Citazioni rilevanti\nLe frasi che meritano di essere riportate testualmente.\n\n## Fatti e cifre\nTabella | Dato | Contesto |\n\n## Domande rimaste senza risposta\nCio su cui non si e arrivati in fondo.",
+        Interview => "Apri con un titolo di primo livello che nomini il tema dell'intervista.\nPoi: «Profilo» con chi e l'intervistato e il contesto; una sezione per ciascun tema toccato, con le posizioni espresse e le motivazioni, riportando fra virgolette i passaggi significativi; «Citazioni rilevanti» con le frasi da conservare testualmente; «Fatti e cifre» come tabella con colonne Dato, Contesto; «Domande rimaste senza risposta».",
 
-        Standup => "## In breve\nTre righe sullo stato complessivo.\n\n## Per persona\nUna sezione per partecipante: fatto, in corso, bloccato da.\n\n## Impedimenti\nTabella | Impedimento | Chi e bloccato | Chi puo sbloccare |\n\n## Attivita da svolgere\nTabella | Attivita | Responsabile | Entro quando |\n\n## Note\nTutto il resto che vale la pena ricordare.",
+        Standup => "Apri con un titolo di primo livello che nomini il gruppo e il periodo.\nPoi: «In breve» con lo stato complessivo in tre righe; una sezione per ciascun partecipante con fatto, in corso e cosa lo blocca; «Impedimenti» come tabella con colonne Impedimento, Chi e bloccato, Chi puo sbloccare; «Attivita da svolgere» come tabella con colonne Attivita, Responsabile, Entro quando; «Note» per il resto.",
 
-        Brainstorm => "## Obiettivo della sessione\nQual era la domanda di partenza.\n\n## Idee emerse\nUna sezione per idea o famiglia di idee: in cosa consiste, chi l'ha proposta, obiezioni e sviluppi.\n\n## Confronto\nTabella | Idea | A favore | Contro |\n\n## Direzioni promettenti\nSu cosa vale la pena insistere e perche.\n\n## Da approfondire\nCosa va verificato prima di decidere.",
+        Brainstorm => "Apri con un titolo di primo livello che nomini la domanda di partenza.\nPoi: «Obiettivo della sessione»; una sezione per ciascuna idea o famiglia di idee, con in cosa consiste, chi l'ha proposta, obiezioni e sviluppi; «Confronto» come tabella con colonne Idea, A favore, Contro; «Direzioni promettenti» con le motivazioni; «Da approfondire» con cosa verificare prima di decidere.",
 
-        Minutes => "## Intestazione\nData, ora, luogo se emerge, presenti con i nomi che compaiono.\n\n## Ordine del giorno\nI punti trattati, nell'ordine in cui sono stati affrontati.\n\n## Svolgimento\nUna sezione per punto, con il resoconto fedele della discussione: interventi, posizioni, obiezioni.\n\n## Deliberazioni\nTabella | Punto | Decisione | Esito |\n\n## Impegni assunti\nTabella | Impegno | Chi | Entro quando |\n\n## Chiusura\nCome si e conclusa la seduta e cosa e stato rinviato.",
+        Minutes => "Apri con un titolo di primo livello che nomini la seduta.\nPoi: «Intestazione» con data, luogo se emerge e presenti nominati; «Ordine del giorno» con i punti nell'ordine trattato; una sezione per ciascun punto con il resoconto fedele degli interventi e delle posizioni; «Deliberazioni» come tabella con colonne Punto, Decisione, Esito; «Impegni assunti» come tabella con colonne Impegno, Chi, Entro quando; «Chiusura» con quanto rinviato.",
     }
 }
 
@@ -101,27 +101,33 @@ fn build_report_prompt(settings: &settings::Settings, kind: &str) -> String {
 
     format!(
         "Sei un analista che redige documenti professionali in italiano a partire da \
-trascrizioni di riunioni, lezioni e conversazioni di lavoro.
+trascrizioni di riunioni, lezioni e conversazioni.
 
-Produci un documento in Markdown, {}. Non e un riassunto: e un documento di lavoro che \
-una persona assente deve poter leggere al posto di aver partecipato.
-
-Struttura da seguire, adattandola al contenuto reale:
-
-# <titolo del documento>
+Scrivi il documento, {}. Non e un riassunto: e un documento di lavoro che una persona \
+assente deve poter leggere al posto di aver partecipato.
 
 {}
 
-Regole di scrittura:
-- Prosa distesa e professionale, mai telegrafica. Ogni sezione ha almeno due paragrafi \
-  di sostanza, non un elenco secco.
+Come scrivere:
+- Prosa distesa e professionale. Ogni sezione ha almeno due paragrafi di sostanza.
 - Conserva nomi di persone, aziende, sistemi, prodotti, cifre e date esattamente come compaiono.
-- Usa **grassetto** per i termini chiave, tabelle per i dati strutturati, elenchi solo \
-  quando l'informazione e davvero una lista.
-- Dove un'informazione non emerge dalla trascrizione scrivi «non indicato», senza inventare.
-- La trascrizione e automatica e contiene errori di riconoscimento: ignora le parole \
-  incomprensibili senza segnalarle e senza costruirci sopra ipotesi.
-- Niente premesse, scuse o commenti sul tuo lavoro: produci solo il documento.{}",
+- **Grassetto** sui termini chiave, tabelle per i dati strutturati, elenchi solo per vere liste.
+- La trascrizione e automatica e contiene errori: ignora le parole incomprensibili senza \
+  segnalarle e senza costruirci sopra ipotesi.
+
+Vincoli assoluti, la loro violazione rende il documento inutilizzabile:
+- La tua risposta inizia con «# » seguito dal titolo. Nessuna riga prima, per nessun motivo.
+- Nessun commento sul tuo lavoro, sui tuoi limiti o su cosa potresti fare in seguito. \
+  Niente frasi come «Capisco», «Posso fornirti», «Se vuoi posso», «Dimmi se procedere», \
+  «Nota: sostituisci», «questa e una bozza». Non offrire alternative e non chiedere conferme.
+- Nessun segnaposto e nessuna istruzione rivolta al lettore. Scrivi il contenuto vero, \
+  non lo scheletro da riempire.
+- Ometti del tutto una sezione o una riga di tabella se la trascrizione non contiene \
+  l'informazione. Non produrre tabelle o elenchi fatti di «non indicato»: una sezione \
+  assente e molto meglio di una sezione vuota.
+- Non aggiungere sezioni su metodo, fonti da verificare o disclaimer.
+- Il documento si chiude con l'ultima sezione di contenuto. Nessuna conclusione che parli \
+  di se stessa, nessuna proposta finale.{}",
         lunghezza(settings.report_length),
         struttura(style),
         extra
@@ -180,6 +186,49 @@ fn title_from_report(report: &str) -> String {
         .unwrap_or_else(|| "Report della sessione".into())
 }
 
+/// Ripulisce l'output dal contorno che i modelli aggiungono comunque: la
+/// premessa prima del titolo e le offerte di aiuto in coda.
+fn clean_report(raw: &str) -> String {
+    let testo = raw.trim();
+
+    // Tutto cio che precede il primo titolo di primo livello e preambolo.
+    let corpo = match testo.find("\n# ") {
+        Some(pos) if !testo.starts_with("# ") => &testo[pos + 1..],
+        _ => testo,
+    };
+
+    const CODE: [&str; 10] = [
+        "se vuoi, posso",
+        "se vuoi posso",
+        "dimmi se vuoi",
+        "fammi sapere se",
+        "posso convertire",
+        "posso generare",
+        "vuoi che proceda",
+        "se preferisci posso",
+        "resto a disposizione",
+        "spero che questo",
+    ];
+
+    let mut righe: Vec<&str> = corpo.lines().collect();
+    while let Some(ultima) = righe.last() {
+        let normalizzata = ultima.trim().to_lowercase();
+        let da_tagliare = normalizzata.is_empty()
+            || CODE.iter().any(|marker| normalizzata.starts_with(marker))
+            || normalizzata.starts_with("- ")
+                && CODE.iter().any(|marker| normalizzata.contains(marker));
+        if da_tagliare && !normalizzata.is_empty() {
+            righe.pop();
+        } else if normalizzata.is_empty() {
+            righe.pop();
+        } else {
+            break;
+        }
+    }
+
+    righe.join("\n").trim().to_string()
+}
+
 fn render_transcript(lines: &[TranscriptLine]) -> String {
     lines
         .iter()
@@ -205,11 +254,12 @@ impl Session<'_> {
         step: usize,
         steps: usize,
         max_tokens: u32,
+        prefill: Option<&str>,
     ) -> Result<String, String> {
         let mut accumulato = String::new();
         let mut ultimo = std::time::Instant::now();
 
-        let testo = provider::stream(
+        let mut testo = provider::stream(
             Request {
                 provider: self.settings.provider,
                 base_url: &self.settings.base_url,
@@ -218,6 +268,7 @@ impl Session<'_> {
                 system,
                 user,
                 max_tokens,
+                prefill,
             },
             |delta| {
                 accumulato.push_str(delta);
@@ -235,6 +286,11 @@ impl Session<'_> {
                 }
             },
         )?;
+
+        // Il prefill non torna nella risposta: va rimesso davanti.
+        if let Some(prefill) = prefill {
+            testo = format!("{prefill}{testo}");
+        }
 
         let _ = self.app.emit(
             "analysis://progress",
@@ -282,6 +338,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
         0,
         1,
         30,
+        Some("TIPO: "),
     ) {
         let mut provvisoria = Analysis::default();
         parse_header(&risposta, &mut provvisoria);
@@ -294,7 +351,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
     let report_tokens = tokens_per(session.settings.report_length);
 
     let report = if transcript.chars().count() <= SINGLE_PASS_CHARS {
-        session.ask(&system_report, &transcript, "writing", 0, 1, report_tokens)?
+        session.ask(&system_report, &transcript, "writing", 0, 1, report_tokens, Some("# "))?
     } else {
         // Prima note dettagliate blocco per blocco, poi il documento finale:
         // così nessuna parte della riunione resta fuori dal report.
@@ -314,6 +371,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
                 indice,
                 totale + 1,
                 NOTES_TOKENS,
+                None,
             )?;
             parziali.push_str(&testo);
             parziali.push_str("\n\n");
@@ -326,8 +384,11 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
             totale,
             totale + 1,
             report_tokens,
+            Some("# "),
         )?
     };
+
+    let report = clean_report(&report);
 
     if report.trim().is_empty() {
         return Err("Il modello non ha prodotto alcun report.".into());
@@ -349,6 +410,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
         0,
         1,
         200,
+        Some("TIPO: "),
     ) {
         parse_header(&header, &mut analysis);
     }
@@ -400,5 +462,36 @@ mod tests {
         let report = "Premessa\n\n# Analisi del gestionale\n\nTesto…";
         assert_eq!(title_from_report(report), "Analisi del gestionale");
         assert_eq!(title_from_report("nessun titolo"), "Report della sessione");
+    }
+}
+
+#[cfg(test)]
+mod pulizia {
+    use super::*;
+
+    #[test]
+    fn taglia_la_premessa_prima_del_titolo() {
+        let raw = "Capisco. Posso fornirti un modello di documento.\n\n\
+Di seguito trovi una bozza formattata.\n\n\
+# Riunione sul gestionale\n\n## Quadro generale\nTesto.";
+        let pulito = clean_report(raw);
+        assert!(pulito.starts_with("# Riunione sul gestionale"));
+        assert!(!pulito.contains("Capisco"));
+    }
+
+    #[test]
+    fn taglia_le_offerte_finali() {
+        let raw = "# Titolo\n\n## Sezione\nContenuto vero.\n\n\
+Se vuoi, posso convertire questa bozza in una versione finale.\n\
+Dimmi se vuoi che proceda.";
+        let pulito = clean_report(raw);
+        assert!(pulito.ends_with("Contenuto vero."));
+        assert!(!pulito.contains("Se vuoi"));
+    }
+
+    #[test]
+    fn lascia_intatto_un_documento_pulito() {
+        let raw = "# Titolo\n\n## Quadro generale\nContenuto.\n\n## Rischi\nAltro contenuto.";
+        assert_eq!(clean_report(raw), raw);
     }
 }

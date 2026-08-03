@@ -72,6 +72,10 @@ pub struct Request<'a> {
     pub system: &'a str,
     pub user: &'a str,
     pub max_tokens: u32,
+    /// Testo messo in bocca al modello come inizio della risposta. È il modo
+    /// più efficace per impedire premesse: se la risposta comincia già con
+    /// «# », non può esserci un «Capisco, posso fornirti…» prima.
+    pub prefill: Option<&'a str>,
 }
 
 /// Esegue la richiesta in streaming e invoca `on_delta` a ogni pezzo di testo.
@@ -132,27 +136,45 @@ pub fn stream(request: Request, mut on_delta: impl FnMut(&str)) -> Result<String
 
 fn build_body(request: &Request) -> serde_json::Value {
     match request.provider {
-        Provider::Anthropic => serde_json::json!({
-            "model": request.model,
-            "max_tokens": request.max_tokens,
-            "stream": true,
-            "system": request.system,
-            "messages": [{"role": "user", "content": request.user}],
-        }),
+        Provider::Anthropic => {
+            let mut messages = vec![serde_json::json!({
+                "role": "user", "content": request.user
+            })];
+            if let Some(prefill) = request.prefill {
+                messages.push(serde_json::json!({
+                    "role": "assistant", "content": prefill
+                }));
+            }
+            serde_json::json!({
+                "model": request.model,
+                "max_tokens": request.max_tokens,
+                "stream": true,
+                "system": request.system,
+                "messages": messages,
+            })
+        }
         Provider::Google => serde_json::json!({
             "systemInstruction": {"parts": [{"text": request.system}]},
             "contents": [{"role": "user", "parts": [{"text": request.user}]}],
             "generationConfig": {"maxOutputTokens": request.max_tokens},
         }),
-        _ => serde_json::json!({
-            "model": request.model,
-            "max_completion_tokens": request.max_tokens,
-            "stream": true,
-            "messages": [
-                {"role": "system", "content": request.system},
-                {"role": "user", "content": request.user},
-            ],
-        }),
+        _ => {
+            let mut messages = vec![
+                serde_json::json!({"role": "system", "content": request.system}),
+                serde_json::json!({"role": "user", "content": request.user}),
+            ];
+            if let Some(prefill) = request.prefill {
+                messages.push(serde_json::json!({
+                    "role": "assistant", "content": prefill
+                }));
+            }
+            serde_json::json!({
+                "model": request.model,
+                "max_completion_tokens": request.max_tokens,
+                "stream": true,
+                "messages": messages,
+            })
+        }
     }
 }
 
