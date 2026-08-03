@@ -52,6 +52,27 @@ function formatStamp(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/// Unisce le righe consecutive della stessa voce: la trascrizione a finestre
+/// spezza gli interventi ogni pochi secondi, e leggerli separati è faticoso.
+function groupBySpeaker(segments: Segment[]): Segment[][] {
+  const gruppi: Segment[][] = [];
+  for (const segment of segments) {
+    const ultimo = gruppi[gruppi.length - 1];
+    const stessaVoce =
+      ultimo &&
+      ultimo[0].track === segment.track &&
+      ultimo[0].speaker_id === segment.speaker_id &&
+      segment.start_ms - ultimo[ultimo.length - 1].end_ms < 4000;
+
+    if (stessaVoce) {
+      ultimo.push(segment);
+    } else {
+      gruppi.push([segment]);
+    }
+  }
+  return gruppi;
+}
+
 export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
@@ -527,81 +548,90 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
               Nessun parlato riconosciuto in questa sessione.
             </p>
           ) : (
-            segments
-              .filter(
+            groupBySpeaker(
+              segments.filter(
                 (segment) =>
                   !filter.trim() ||
                   segment.text.toLowerCase().includes(filter.toLowerCase()) ||
                   (segment.speaker_label ?? "")
                     .toLowerCase()
                     .includes(filter.toLowerCase()),
-              )
-              .map((segment) => (
-              <div
-                key={segment.id}
-                className={`group -mx-2 flex gap-3 rounded-md px-2 py-1 transition-colors ${
-                  playhead >= segment.start_ms && playhead < segment.end_ms
-                    ? "bg-accent-soft"
-                    : "hover:bg-surface-raised/50"
-                }`}
-              >
-                <button
-                  onClick={() => setSeekTo(segment.start_ms)}
-                  title="Ascolta da qui"
-                  disabled={!audioPath}
-                  className="shrink-0 pt-0.5 font-mono text-xs text-ink-muted hover:text-accent disabled:hover:text-ink-muted"
+              ),
+            ).map((gruppo) => {
+              const primo = gruppo[0];
+              const attivo =
+                playhead >= primo.start_ms &&
+                playhead < gruppo[gruppo.length - 1].end_ms;
+              const colore =
+                primo.track === "mic"
+                  ? "var(--accent)"
+                  : primo.speaker_id !== null
+                    ? speakerColor(
+                        speakers.find((v) => v.id === primo.speaker_id)
+                          ?.cluster_index ?? 0,
+                      )
+                    : "var(--ink-muted)";
+
+              return (
+                <div
+                  key={primo.id}
+                  className={`-mx-2 flex gap-3 rounded-md px-2 py-1.5 transition-colors ${
+                    attivo ? "bg-accent-soft" : "hover:bg-surface-raised/50"
+                  }`}
                 >
-                  {formatStamp(segment.start_ms)}
-                </button>
-                <span
-                  className="flex w-28 shrink-0 items-center gap-1.5 pt-0.5 text-xs font-medium"
-                  style={{
-                    color:
-                      segment.track === "mic"
-                        ? "var(--accent)"
-                        : segment.speaker_id !== null
-                          ? speakerColor(
-                              speakers.find((v) => v.id === segment.speaker_id)
-                                ?.cluster_index ?? 0,
-                            )
-                          : "var(--ink-muted)",
-                  }}
-                >
-                  <span className="truncate">
-                    {speakerOf(segment.track, segment.speaker_label)}
-                  </span>
-                </span>
-                {editingId === segment.id ? (
-                  <textarea
-                    autoFocus
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onBlur={() => commitSegment(segment)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        void commitSegment(segment);
-                      } else if (event.key === "Escape") {
-                        setEditingId(null);
-                      }
-                    }}
-                    rows={2}
-                    className="flex-1 rounded border border-accent bg-surface-sunken px-2 py-1 text-sm leading-relaxed outline-none"
-                  />
-                ) : (
-                  <p
-                    onClick={() => {
-                      setEditingId(segment.id);
-                      setDraft(segment.text);
-                    }}
-                    title="Clicca per correggere"
-                    className="flex-1 cursor-text text-sm leading-relaxed"
+                  <button
+                    onClick={() => setSeekTo(primo.start_ms)}
+                    title="Ascolta da qui"
+                    disabled={!audioPath}
+                    className="shrink-0 pt-0.5 font-mono text-xs text-ink-muted hover:text-accent disabled:hover:text-ink-muted"
                   >
-                    {segment.text}
-                  </p>
-                )}
-              </div>
-            ))
+                    {formatStamp(primo.start_ms)}
+                  </button>
+
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className="mb-0.5 block text-xs font-medium"
+                      style={{ color: colore }}
+                    >
+                      {speakerOf(primo.track, primo.speaker_label)}
+                    </span>
+                    {gruppo.map((segment) => (
+                      <span key={segment.id}>
+                        {editingId === segment.id ? (
+                          <textarea
+                            autoFocus
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onBlur={() => commitSegment(segment)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey) {
+                                event.preventDefault();
+                                void commitSegment(segment);
+                              } else if (event.key === "Escape") {
+                                setEditingId(null);
+                              }
+                            }}
+                            rows={2}
+                            className="brief-field my-1 w-full px-2 py-1 text-sm leading-relaxed"
+                          />
+                        ) : (
+                          <span
+                            onClick={() => {
+                              setEditingId(segment.id);
+                              setDraft(segment.text);
+                            }}
+                            title="Clicca per correggere"
+                            className="cursor-text text-sm leading-relaxed"
+                          >
+                            {segment.text}{" "}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           )}
         </section>
         )}
