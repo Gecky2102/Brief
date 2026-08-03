@@ -146,6 +146,16 @@ export async function listSegments(sessionId: number): Promise<Segment[]> {
   );
 }
 
+/// Whisper sbaglia parole e nomi propri: poterli correggere a mano evita che
+/// l'errore si propaghi al riassunto e alla ricerca.
+export async function updateSegmentText(
+  id: number,
+  text: string,
+): Promise<void> {
+  const conn = await db();
+  await conn.execute("UPDATE segments SET text = $1 WHERE id = $2", [text, id]);
+}
+
 export async function setSessionKind(
   id: number,
   kind: SessionKind,

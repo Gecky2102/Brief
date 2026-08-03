@@ -7,6 +7,7 @@ import {
   saveAnalysis,
   setSessionKind,
   setSessionTitle,
+  updateSegmentText,
   type Analysis,
   type Segment,
   type Session,
@@ -62,6 +63,8 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState(session.title);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
 
   const load = useCallback(() => {
     setTitle(session.title);
@@ -111,6 +114,18 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       setAnalyzing(false);
       setDownload(null);
     }
+  }
+
+  async function commitSegment(segment: Segment) {
+    const trimmed = draft.trim();
+    setEditingId(null);
+    if (!trimmed || trimmed === segment.text) return;
+    await updateSegmentText(segment.id, trimmed);
+    setSegments((current) =>
+      current.map((item) =>
+        item.id === segment.id ? { ...item, text: trimmed } : item,
+      ),
+    );
   }
 
   async function changeKind(kind: SessionKind) {
@@ -286,15 +301,50 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             </p>
           ) : (
             segments.map((segment) => (
-              <p key={segment.id} className="text-sm leading-relaxed">
-                <span className="mr-2 font-mono text-xs text-ink-muted">
+              <div
+                key={segment.id}
+                className="group flex gap-3 rounded-md px-2 py-1 -mx-2 hover:bg-surface-raised/50"
+              >
+                <span className="shrink-0 pt-0.5 font-mono text-xs text-ink-muted">
                   {formatStamp(segment.start_ms)}
                 </span>
-                <span className="mr-2 text-xs font-medium text-accent">
+                <span
+                  className={`w-24 shrink-0 pt-0.5 text-xs font-medium ${
+                    segment.track === "mic" ? "text-accent" : "text-ink-muted"
+                  }`}
+                >
                   {speakerOf(segment.track)}
                 </span>
-                {segment.text}
-              </p>
+                {editingId === segment.id ? (
+                  <textarea
+                    autoFocus
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onBlur={() => commitSegment(segment)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void commitSegment(segment);
+                      } else if (event.key === "Escape") {
+                        setEditingId(null);
+                      }
+                    }}
+                    rows={2}
+                    className="flex-1 rounded border border-accent bg-surface-sunken px-2 py-1 text-sm leading-relaxed outline-none"
+                  />
+                ) : (
+                  <p
+                    onClick={() => {
+                      setEditingId(segment.id);
+                      setDraft(segment.text);
+                    }}
+                    title="Clicca per correggere"
+                    className="flex-1 cursor-text text-sm leading-relaxed"
+                  >
+                    {segment.text}
+                  </p>
+                )}
+              </div>
             ))
           )}
         </section>
