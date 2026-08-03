@@ -12,6 +12,13 @@ const NOTES_TOKENS: u32 = 2_000;
 const CHUNK_CHARS: usize = 24_000;
 const SINGLE_PASS_CHARS: usize = 40_000;
 
+#[derive(Deserialize, Default)]
+pub struct SessionContext {
+    pub date: String,
+    pub duration_minutes: i64,
+    pub speakers: Vec<String>,
+}
+
 #[derive(Deserialize)]
 pub struct TranscriptLine {
     pub speaker: String,
@@ -229,6 +236,19 @@ fn clean_report(raw: &str) -> String {
     righe.join("\n").trim().to_string()
 }
 
+/// Intestazione con i dati oggettivi della sessione: senza, il modello non
+/// sa quando si è svolta né chi c'era, e finisce per scrivere «non indicato».
+fn context_header(context: &SessionContext) -> String {
+    let mut righe = vec![format!("Data: {}", context.date)];
+    if context.duration_minutes > 0 {
+        righe.push(format!("Durata: {} minuti", context.duration_minutes));
+    }
+    if !context.speakers.is_empty() {
+        righe.push(format!("Voci presenti: {}", context.speakers.join(", ")));
+    }
+    format!("Dati della sessione:\n{}\n\n", righe.join("\n"))
+}
+
 fn render_transcript(lines: &[TranscriptLine]) -> String {
     lines
         .iter()
@@ -309,13 +329,20 @@ impl Session<'_> {
 pub async fn analyze_session(
     app: AppHandle,
     lines: Vec<TranscriptLine>,
+    context: Option<SessionContext>,
 ) -> Result<Analysis, String> {
-    tauri::async_runtime::spawn_blocking(move || analyze_blocking(app, lines))
+    tauri::async_runtime::spawn_blocking(move || {
+        analyze_blocking(app, lines, context.unwrap_or_default())
+    })
         .await
         .map_err(|cause| format!("Analisi interrotta: {cause}"))?
 }
 
-fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analysis, String> {
+fn analyze_blocking(
+    app: AppHandle,
+    lines: Vec<TranscriptLine>,
+    context: SessionContext,
+) -> Result<Analysis, String> {
     if lines.is_empty() {
         return Err("Non c'è nulla da analizzare: la trascrizione è vuota.".into());
     }
@@ -326,7 +353,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
         app: &app,
     };
 
-    let transcript = render_transcript(&lines);
+    let transcript = format!("{}{}", context_header(&context), render_transcript(&lines));
 
     // Riconosce il tipo di conversazione prima di scrivere: il taglio del
     // documento dipende da quello, e con «Auto» è l'unico modo per sceglierlo.

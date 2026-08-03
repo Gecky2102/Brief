@@ -153,10 +153,17 @@ export function modelsStatus(): Promise<ModelsStatus> {
   return invoke<ModelsStatus>("models_status");
 }
 
+export type SessionContext = {
+  date: string;
+  duration_minutes: number;
+  speakers: string[];
+};
+
 export function analyzeSession(
   lines: { speaker: string; text: string }[],
+  context: SessionContext,
 ): Promise<Analysis> {
-  return invoke<Analysis>("analyze_session", { lines });
+  return invoke<Analysis>("analyze_session", { lines, context });
 }
 
 export type ImportedAudio = {

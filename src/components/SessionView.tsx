@@ -142,7 +142,22 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
         speaker: speakerOf(segment.track, segment.speaker_label),
         text: segment.text,
       }));
-      const result = await analyzeSession(lines);
+      const nomi = [
+        ...new Set(
+          segments.map((segment) =>
+            speakerOf(segment.track, segment.speaker_label),
+          ),
+        ),
+      ];
+
+      const result = await analyzeSession(lines, {
+        date: new Date(session.started_at).toLocaleString("it-IT", {
+          dateStyle: "full",
+          timeStyle: "short",
+        }),
+        duration_minutes: Math.round(session.duration_ms / 60000),
+        speakers: nomi,
+      });
       await saveAnalysis(session.id, result, "provider-online");
       setAnalysis(result);
 
