@@ -7,6 +7,7 @@ import SpeakerStats from "./SpeakerStats";
 import {
   KIND_LABELS,
   listSegments,
+  assignSegment,
   listSpeakers,
   loadAnalysis,
   listFolders,
@@ -89,6 +90,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [showOptions, setShowOptions] = useState(false);
   const [estimate, setEstimate] = useState<AnalysisEstimate | null>(null);
   const [folders, setFolders] = useState<(Folder & { count: number })[]>([]);
+  const [reassigning, setReassigning] = useState<number | null>(null);
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -270,6 +272,17 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
 
   async function rinomina(id: number, label: string) {
     await renameSpeaker(id, label);
+    ricaricaVoci();
+  }
+
+  /// Sposta un singolo intervento su un'altra voce: il riconoscimento sbaglia
+  /// soprattutto sui passaggi brevi o sovrapposti, e correggerli a mano è
+  /// l'unico modo per avere un report con le attribuzioni giuste.
+  async function riassegna(segmentIds: number[], speakerId: number | null) {
+    for (const id of segmentIds) {
+      await assignSegment(id, speakerId);
+    }
+    setReassigning(null);
     ricaricaVoci();
   }
 
@@ -706,12 +719,43 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                   </button>
 
                   <div className="min-w-0 flex-1">
-                    <span
-                      className="mb-0.5 block text-xs font-medium"
-                      style={{ color: colore }}
-                    >
-                      {speakerOf(primo.track, primo.speaker_label)}
-                    </span>
+                    {primo.track === "mic" ? (
+                      <span
+                        className="mb-0.5 block text-xs font-medium"
+                        style={{ color: colore }}
+                      >
+                        Io
+                      </span>
+                    ) : reassigning === primo.id ? (
+                      <select
+                        autoFocus
+                        value={primo.speaker_id ?? ""}
+                        onChange={(event) =>
+                          riassegna(
+                            gruppo.map((segmento) => segmento.id),
+                            event.target.value ? Number(event.target.value) : null,
+                          )
+                        }
+                        onBlur={() => setReassigning(null)}
+                        className="brief-field mb-0.5 px-1.5 py-0.5 text-xs"
+                      >
+                        <option value="">Non attribuito</option>
+                        {speakers.map((voce) => (
+                          <option key={voce.id} value={voce.id}>
+                            {voce.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <button
+                        onClick={() => setReassigning(primo.id)}
+                        title="Attribuisci a un'altra voce"
+                        className="mb-0.5 block text-xs font-medium hover:underline"
+                        style={{ color: colore }}
+                      >
+                        {speakerOf(primo.track, primo.speaker_label)}
+                      </button>
+                    )}
                     {gruppo.map((segment) => (
                       <span key={segment.id}>
                         {editingId === segment.id ? (

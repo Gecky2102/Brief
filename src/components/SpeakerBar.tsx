@@ -120,8 +120,9 @@ export default function SpeakerBar({
       </div>
 
       <p className="text-[11px] leading-snug text-ink-muted">
-        Clicca una voce per darle un nome. Tasto destro per unirla a un'altra,
-        quando la stessa persona è stata divisa in due.
+        Clicca una voce per darle un nome, tasto destro per unirla a un'altra.
+        Nella trascrizione puoi cliccare il nome sopra un intervento per
+        attribuirlo a una voce diversa.
       </p>
     </div>
   );
