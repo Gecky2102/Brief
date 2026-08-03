@@ -277,11 +277,11 @@ pub fn transcribe_samples(
 }
 
 pub fn is_model_ready(app: &AppHandle) -> bool {
-    models::path_if_present(app, &models::WHISPER).is_some()
+    models::path_if_present(app, crate::settings::whisper_model(app)).is_some()
 }
 
 pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
-    let path = models::ensure(app, &models::WHISPER)?;
+    let path = models::ensure(app, crate::settings::whisper_model(app))?;
 
     let context = Arc::new(
         WhisperContext::new_with_params(&path, WhisperContextParameters::default())

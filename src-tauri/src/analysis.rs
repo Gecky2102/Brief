@@ -40,7 +40,7 @@ pub struct Analysis {
 }
 
 pub fn is_model_ready(app: &AppHandle) -> bool {
-    models::path_if_present(app, &models::LLM).is_some()
+    models::path_if_present(app, crate::settings::llm_model(app)).is_some()
 }
 
 fn shorten(transcript: &str) -> String {
@@ -342,7 +342,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
     // insieme: su 16 GB è proprio il caso da evitare.
     crate::transcriber::stop();
 
-    let path = models::ensure(&app, &models::LLM)?;
+    let path = models::ensure(&app, crate::settings::llm_model(&app))?;
     let transcript = render_transcript(&lines);
     let engine = Engine::new(&path)?;
 

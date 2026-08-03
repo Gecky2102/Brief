@@ -26,6 +26,17 @@ pub const WHISPER: ModelSpec = ModelSpec {
     bytes: 190_085_487,
 };
 
+/// Modello di trascrizione grande: qualità nettamente superiore su parlato
+/// spontaneo e dialetti, e grazie alla variante «turbo» resta veloce.
+pub const WHISPER_ACCURATE: ModelSpec = ModelSpec {
+    key: "whisper",
+    label: "Modello di trascrizione accurato",
+    file_name: "ggml-large-v3-turbo-q5_0.bin",
+    url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
+    sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+    bytes: 574_041_195,
+};
+
 pub const LLM: ModelSpec = ModelSpec {
     key: "llm",
     label: "Modello di analisi",
@@ -33,6 +44,17 @@ pub const LLM: ModelSpec = ModelSpec {
     url: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
     sha256: "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
     bytes: 2_104_932_768,
+};
+
+/// Modello di analisi grande: estrae dettagli e nomi propri molto meglio del
+/// 3B, che su trascrizioni rumorose tende al generico.
+pub const LLM_ACCURATE: ModelSpec = ModelSpec {
+    key: "llm",
+    label: "Modello di analisi accurato",
+    file_name: "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+    url: "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+    sha256: "65b8fcd92af6b4fefa935c625d1ac27ea29dcb6ee14589c55a8f115ceaaa1423",
+    bytes: 4_683_074_240,
 };
 
 #[derive(Clone, Serialize)]

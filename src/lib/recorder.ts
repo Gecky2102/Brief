@@ -59,6 +59,17 @@ export function systemTrackHealth(): Promise<number> {
   return invoke<number>("system_track_health");
 }
 
+export type Quality = "fast" | "accurate";
+export type Settings = { quality: Quality };
+
+export function getSettings(): Promise<Settings> {
+  return invoke<Settings>("get_settings");
+}
+
+export function setSettings(settings: Settings): Promise<void> {
+  return invoke<void>("set_settings", { settings });
+}
+
 export function modelsStatus(): Promise<ModelsStatus> {
   return invoke<ModelsStatus>("models_status");
 }

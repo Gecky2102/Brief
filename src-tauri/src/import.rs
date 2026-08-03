@@ -100,7 +100,7 @@ fn import_blocking(app: AppHandle, session_id: i64) -> Result<ImportedAudio, Str
     to_whisper_wav(&source, &wav)?;
 
     let samples = read_samples(&wav)?;
-    let model = models::ensure(&app, &models::WHISPER)?;
+    let model = models::ensure(&app, crate::settings::whisper_model(&app))?;
     let duration_ms = (samples.len() as i64) * 1000 / 16_000;
 
     crate::transcriber::transcribe_samples(&app, session_id, "system", &samples, &model)?;

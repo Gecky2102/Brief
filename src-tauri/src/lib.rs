@@ -3,6 +3,7 @@ mod audio;
 mod export;
 mod import;
 mod models;
+mod settings;
 mod transcriber;
 
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -40,7 +41,9 @@ pub fn run() {
             export::export_markdown,
             export::export_audio,
             export::delete_recording,
-            import::import_audio
+            import::import_audio,
+            settings::get_settings,
+            settings::set_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
