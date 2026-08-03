@@ -263,3 +263,42 @@ mod tests {
         assert_eq!(shorten(breve), breve);
     }
 }
+
+/// Test end-to-end dell'analisi. Richiede il modello scaricato e verifica anche
+/// che whisper.cpp e llama.cpp convivano nello stesso binario nonostante i
+/// simboli ggml duplicati segnalati dal linker.
+/// `BRIEF_TEST_LLM=... cargo test -- --ignored`
+#[cfg(test)]
+mod integration {
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn analizza_una_conversazione() {
+        let model = std::env::var("BRIEF_TEST_LLM").expect("BRIEF_TEST_LLM");
+
+        let transcript = "Io: Allora, per il preventivo del cliente Rossi, direi di chiudere a quattromila euro.\n\
+Interlocutore: D'accordo, ma serve la conferma di Marco prima di mandarlo.\n\
+Io: Va bene, lo sento domani mattina e poi lo spedisco entro mercoledì.\n\
+Interlocutore: Perfetto. Resta da capire se includiamo anche la manutenzione annuale.\n\
+Io: Quello lo decidiamo dopo aver parlato con Marco.";
+
+        let prompt = build_prompt(transcript);
+        let raw = generate(std::path::Path::new(&model), &prompt).expect("generazione");
+        println!("GREZZO: {raw}");
+
+        let json = extract_json(&raw).expect("json presente");
+        let analysis: Analysis = serde_json::from_str(&json).expect("json valido");
+
+        println!(
+            "TIPO: {} | TITOLO: {} | AZIONI: {:?} | DOMANDE: {:?}",
+            analysis.kind, analysis.title, analysis.actions, analysis.questions
+        );
+
+        assert!(!analysis.summary.trim().is_empty(), "riassunto vuoto");
+        assert!(
+            !analysis.actions.is_empty() || !analysis.decisions.is_empty(),
+            "né decisioni né cose da fare estratte"
+        );
+    }
+}
