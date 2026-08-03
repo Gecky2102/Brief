@@ -195,6 +195,18 @@ export function onImportProgress(
   );
 }
 
+export type AnalysisEstimate = {
+  characters: number;
+  chunks: number;
+  calls: number;
+};
+
+export function estimateAnalysis(
+  lines: { speaker: string; text: string }[],
+): Promise<AnalysisEstimate> {
+  return invoke<AnalysisEstimate>("estimate_analysis", { lines });
+}
+
 export function compressRecording(directory: string): Promise<void> {
   return invoke<void>("compress_recording", { directory });
 }

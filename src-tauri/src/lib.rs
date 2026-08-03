@@ -47,6 +47,7 @@ pub fn run() {
             audio::is_recording,
             audio::system_track_health,
             analysis::analyze_session,
+            analysis::estimate_analysis,
             analysis::models_status,
             export::compress_recording,
             export::export_markdown,

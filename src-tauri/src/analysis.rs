@@ -331,6 +331,37 @@ impl Session<'_> {
     }
 }
 
+/// Stima grossolana del lavoro richiesto, per dire in anticipo quante
+/// chiamate serviranno e quanto testo verrà inviato al fornitore.
+#[derive(Serialize)]
+pub struct AnalysisEstimate {
+    characters: usize,
+    chunks: usize,
+    calls: usize,
+}
+
+#[tauri::command]
+pub fn estimate_analysis(lines: Vec<TranscriptLine>) -> AnalysisEstimate {
+    let caratteri: usize = lines
+        .iter()
+        .map(|line| line.speaker.chars().count() + line.text.chars().count() + 2)
+        .sum();
+
+    let chunks = if caratteri <= SINGLE_PASS_CHARS {
+        0
+    } else {
+        caratteri.div_ceil(CHUNK_CHARS)
+    };
+
+    AnalysisEstimate {
+        characters: caratteri,
+        chunks,
+        // Una per la classificazione, una per blocco, una per il documento,
+        // una per l'intestazione.
+        calls: 1 + chunks + 1 + 1,
+    }
+}
+
 #[tauri::command]
 pub async fn analyze_session(
     app: AppHandle,

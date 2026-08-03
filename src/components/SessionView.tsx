@@ -26,12 +26,14 @@ import { fileNameFor, speakerOf, toMarkdown } from "../lib/markdown";
 import {
   analyzeSession,
   audioFile,
+  estimateAnalysis,
   getSettings,
   setSettings,
   exportAudio,
   exportMarkdown,
   onAnalysisProgress,
   onDownloadProgress,
+  type AnalysisEstimate,
   type AnalysisProgress,
   type DownloadProgress,
   type ReportLength,
@@ -81,6 +83,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [filter, setFilter] = useState("");
   const [settings, setLocalSettings] = useState<Settings | null>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [estimate, setEstimate] = useState<AnalysisEstimate | null>(null);
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -102,6 +105,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     listSegments(session.id).then(setSegments).catch(() => undefined);
     listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
     getSettings().then(setLocalSettings).catch(() => undefined);
+    setEstimate(null);
     setAudioPath(null);
     setPlayhead(0);
     if (session.audio_path) {
@@ -111,6 +115,23 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   }, [session.id, session.title]);
 
   useEffect(load, [load]);
+
+  // Quanto testo verrà inviato e quante chiamate serviranno: su una riunione
+  // lunga la differenza fra un blocco e otto si sente nella bolletta.
+  useEffect(() => {
+    if (segments.length === 0) {
+      setEstimate(null);
+      return;
+    }
+    estimateAnalysis(
+      segments.map((segment) => ({
+        speaker: speakerOf(segment.track, segment.speaker_label),
+        text: segment.text,
+      })),
+    )
+      .then(setEstimate)
+      .catch(() => undefined);
+  }, [segments]);
 
   // ⌘R rigenera, ⌘P stampa, ⌘⇧C copia: le tre azioni che si ripetono di più.
   useEffect(() => {
@@ -416,8 +437,19 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-ink-muted">
+            <p className="text-[11px] leading-relaxed text-ink-muted">
               Premi «Rigenera report» per applicare il nuovo taglio.
+              {estimate && estimate.characters > 0 && (
+                <>
+                  {" "}
+                  Verranno inviate{" "}
+                  {Math.round(estimate.characters / 1000)} mila battute in{" "}
+                  {estimate.calls} richieste
+                  {estimate.chunks > 0 &&
+                    `, perché la trascrizione viene letta in ${estimate.chunks} parti`}
+                  .
+                </>
+              )}
             </p>
           </div>
         )}
