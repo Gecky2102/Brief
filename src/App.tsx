@@ -13,7 +13,14 @@ import {
   type Session,
 } from "./lib/db";
 import { deleteRecording, exportMany } from "./lib/recorder";
-import { listSegments, loadAnalysis } from "./lib/db";
+import {
+  createFolder,
+  deleteFolder,
+  listFolders,
+  listSegments,
+  loadAnalysis,
+  type Folder,
+} from "./lib/db";
 import { fileNameFor, toMarkdown } from "./lib/markdown";
 
 /// Raggruppa per periodo come fanno Foto e Note: scorrere una lista piatta di
@@ -65,15 +72,20 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [folders, setFolders] = useState<(Folder & { count: number })[]>([]);
+  const [activeFolder, setActiveFolder] = useState<number | null | undefined>(
+    undefined,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     const trimmed = query.trim();
     if (!trimmed) {
       setHits({});
-      listSessions()
+      listSessions(activeFolder)
         .then(setSessions)
         .catch((cause: unknown) => setError(String(cause)));
+      listFolders().then(setFolders).catch(() => undefined);
       return;
     }
 
@@ -211,6 +223,68 @@ export default function App() {
             className="brief-field w-full px-2.5 py-1.5 text-xs"
           />
         </header>
+
+        {folders.length > 0 && (
+          <div className="flex flex-wrap gap-1 px-3 pb-2">
+            <button
+              onClick={() => setActiveFolder(undefined)}
+              className={`rounded-full px-2 py-0.5 text-[11px] transition-colors ${
+                activeFolder === undefined
+                  ? "bg-accent text-white"
+                  : "border border-edge hover:bg-surface-raised"
+              }`}
+            >
+              Tutte
+            </button>
+            {folders.map((folder) => (
+              <button
+                key={folder.id}
+                onClick={() => setActiveFolder(folder.id)}
+                onContextMenu={async (event) => {
+                  event.preventDefault();
+                  await deleteFolder(folder.id);
+                  if (activeFolder === folder.id) setActiveFolder(undefined);
+                  refresh();
+                }}
+                title="Tasto destro per eliminare la cartella, le sessioni restano"
+                className={`rounded-full px-2 py-0.5 text-[11px] transition-colors ${
+                  activeFolder === folder.id
+                    ? "bg-accent text-white"
+                    : "border border-edge hover:bg-surface-raised"
+                }`}
+              >
+                {folder.name} {folder.count}
+              </button>
+            ))}
+            <button
+              onClick={async () => {
+                const nome = window.prompt("Nome della cartella");
+                if (nome?.trim()) {
+                  await createFolder(nome.trim());
+                  refresh();
+                }
+              }}
+              className="rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-muted hover:bg-surface-raised"
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        {folders.length === 0 && sessions.length > 2 && (
+          <button
+            onClick={async () => {
+              const nome = window.prompt("Nome della prima cartella");
+              if (nome?.trim()) {
+                await createFolder(nome.trim());
+                refresh();
+              }
+            }}
+            className="mx-3 mb-2 rounded-md border border-edge px-2 py-1 text-[11px] text-ink-muted hover:bg-surface-raised"
+          >
+            Crea una cartella
+          </button>
+        )}
 
         <nav className="flex-1 overflow-y-auto px-2 pb-2">
           {sessions.length === 0 && (

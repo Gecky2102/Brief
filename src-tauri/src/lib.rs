@@ -30,6 +30,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/003_excluded.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "add folders to organise sessions",
+            sql: include_str!("../migrations/004_folders.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

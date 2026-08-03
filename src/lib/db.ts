@@ -25,6 +25,7 @@ export type Session = {
   ended_at: string | null;
   duration_ms: number;
   audio_path: string | null;
+  folder_id: number | null;
 };
 
 export type Segment = {
@@ -36,6 +37,12 @@ export type Segment = {
   speaker_id: number | null;
   speaker_label: string | null;
   excluded: number;
+};
+
+export type Folder = {
+  id: number;
+  name: string;
+  color: string;
 };
 
 export type Speaker = {
@@ -76,12 +83,59 @@ export async function reconcileOrphanSessions(): Promise<void> {
   );
 }
 
-export async function listSessions(): Promise<Session[]> {
+export async function listSessions(folderId?: number | null): Promise<Session[]> {
   const conn = await db();
+  if (folderId === undefined) {
+    return conn.select<Session[]>(
+      `SELECT id, title, kind, started_at, ended_at, duration_ms, audio_path,
+              folder_id
+       FROM sessions ORDER BY started_at DESC`,
+    );
+  }
   return conn.select<Session[]>(
-    `SELECT id, title, kind, started_at, ended_at, duration_ms, audio_path
-     FROM sessions ORDER BY started_at DESC`,
+    `SELECT id, title, kind, started_at, ended_at, duration_ms, audio_path,
+            folder_id
+     FROM sessions
+     WHERE folder_id IS $1
+     ORDER BY started_at DESC`,
+    [folderId],
   );
+}
+
+export async function listFolders(): Promise<(Folder & { count: number })[]> {
+  const conn = await db();
+  return conn.select<(Folder & { count: number })[]>(
+    `SELECT f.id, f.name, f.color, COUNT(s.id) AS count
+     FROM folders f
+     LEFT JOIN sessions s ON s.folder_id = f.id
+     GROUP BY f.id ORDER BY f.name`,
+  );
+}
+
+export async function createFolder(name: string): Promise<number> {
+  const conn = await db();
+  const result = await conn.execute("INSERT INTO folders (name) VALUES ($1)", [
+    name,
+  ]);
+  return Number(result.lastInsertId ?? 0);
+}
+
+export async function deleteFolder(id: number): Promise<void> {
+  const conn = await db();
+  // Le sessioni non si perdono: tornano semplicemente fuori dalle cartelle.
+  await conn.execute("UPDATE sessions SET folder_id = NULL WHERE folder_id = $1", [id]);
+  await conn.execute("DELETE FROM folders WHERE id = $1", [id]);
+}
+
+export async function moveSession(
+  sessionId: number,
+  folderId: number | null,
+): Promise<void> {
+  const conn = await db();
+  await conn.execute("UPDATE sessions SET folder_id = $1 WHERE id = $2", [
+    folderId,
+    sessionId,
+  ]);
 }
 
 export type SearchHit = Session & { excerpt: string; hits: number };
@@ -108,7 +162,8 @@ export async function searchWithExcerpts(query: string): Promise<SearchHit[]> {
 export async function searchSessions(query: string): Promise<Session[]> {
   const conn = await db();
   return conn.select<Session[]>(
-    `SELECT s.id, s.title, s.kind, s.started_at, s.ended_at, s.duration_ms, s.audio_path
+    `SELECT s.id, s.title, s.kind, s.started_at, s.ended_at, s.duration_ms,
+            s.audio_path, s.folder_id
      FROM segments_fts f
      JOIN segments g ON g.id = f.rowid
      JOIN sessions s ON s.id = g.session_id

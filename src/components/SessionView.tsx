@@ -9,7 +9,10 @@ import {
   listSegments,
   listSpeakers,
   loadAnalysis,
+  listFolders,
+  moveSession,
   toggleSegmentExcluded,
+  type Folder,
   mergeSpeakers,
   renameSpeaker,
   saveAnalysis,
@@ -85,6 +88,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [settings, setLocalSettings] = useState<Settings | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [estimate, setEstimate] = useState<AnalysisEstimate | null>(null);
+  const [folders, setFolders] = useState<(Folder & { count: number })[]>([]);
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -107,6 +111,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
     getSettings().then(setLocalSettings).catch(() => undefined);
     setEstimate(null);
+    listFolders().then(setFolders).catch(() => undefined);
     setAudioPath(null);
     setPlayhead(0);
     if (session.audio_path) {
@@ -122,6 +127,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   useEffect(() => {
     if (segments.length === 0) {
       setEstimate(null);
+    listFolders().then(setFolders).catch(() => undefined);
       return;
     }
     estimateAnalysis(
@@ -322,6 +328,26 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           <span>·</span>
           <span>{formatStamp(session.duration_ms)}</span>
           <span>·</span>
+          {folders.length > 0 && (
+            <select
+              value={session.folder_id ?? ""}
+              onChange={async (event) => {
+                await moveSession(
+                  session.id,
+                  event.target.value ? Number(event.target.value) : null,
+                );
+                onChanged();
+              }}
+              className="brief-field px-2 py-1 text-xs text-ink"
+            >
+              <option value="">Nessuna cartella</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             value={session.kind}
             onChange={(event) => changeKind(event.target.value as SessionKind)}
