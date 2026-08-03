@@ -365,6 +365,43 @@ mod integration {
             .collect()
     }
 
+    /// Trascrive una registrazione lunga a finestre, come fa l'importazione,
+    /// e stampa il testo completo. Serve a provare la catena su audio vero.
+    #[test]
+    #[ignore]
+    fn trascrive_registrazione_lunga() {
+        let wav = std::env::var("BRIEF_TEST_WAV").expect("BRIEF_TEST_WAV");
+        let model = std::env::var("BRIEF_TEST_MODEL").expect("BRIEF_TEST_MODEL");
+
+        let samples = read_wav_mono16(&wav);
+        let context =
+            WhisperContext::new_with_params(&model, WhisperContextParameters::default())
+                .expect("modello caricato");
+
+        let window = (SAMPLE_RATE * MAX_SEGMENT_MS / 1000) as usize;
+        let mut tenuti = 0;
+        let mut scartati = 0;
+
+        for (index, chunk) in samples.chunks(window).enumerate() {
+            if rms(chunk) < SILENCE_RMS {
+                scartati += 1;
+                continue;
+            }
+            match transcribe(&context, chunk) {
+                Ok(text) if !is_noise(&text) => {
+                    tenuti += 1;
+                    let secondi = index * (MAX_SEGMENT_MS as usize) / 1000;
+                    println!("[{:02}:{:02}] {text}", secondi / 60, secondi % 60);
+                }
+                Ok(_) => scartati += 1,
+                Err(message) => println!("ERRORE: {message}"),
+            }
+        }
+
+        println!("RIEPILOGO segmenti_tenuti={tenuti} scartati={scartati}");
+        assert!(tenuti > 0, "nessun parlato riconosciuto");
+    }
+
     #[test]
     #[ignore]
     fn trascrive_parlato_italiano() {
