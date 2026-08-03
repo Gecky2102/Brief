@@ -241,13 +241,13 @@ export default function Recorder({ onFinished }: Props) {
     recording && lines.length === 0 && Date.now() - lastSpeechMs.current < 60000;
 
   return (
-    <div className="flex h-full w-full flex-col items-center gap-7 overflow-y-auto px-8 py-10">
+    <div className="brief-drag flex h-full w-full flex-col items-center gap-7 overflow-y-auto px-8 pb-10 pt-14">
       <div className="flex flex-col items-center gap-5">
         <div className="flex items-center gap-3">
           {recording && (
             <span className="brief-live-dot h-2.5 w-2.5 rounded-full bg-live" />
           )}
-          <span className="font-mono text-6xl tabular-nums tracking-tight">
+          <span className="text-6xl font-light tabular-nums tracking-tight">
             {formatClock(elapsedMs)}
           </span>
         </div>
@@ -255,10 +255,10 @@ export default function Recorder({ onFinished }: Props) {
         <button
           onClick={recording ? end : begin}
           disabled={busy}
-          className={`rounded-full px-7 py-3 text-sm font-medium transition-all disabled:opacity-60 ${
+          className={`px-7 py-2.5 text-[13px] disabled:opacity-50 ${
             recording
-              ? "border border-edge bg-surface-raised text-ink hover:border-live hover:text-live"
-              : "bg-accent text-white hover:brightness-110"
+              ? "brief-button text-live"
+              : "brief-button-primary"
           }`}
         >
           {phase === "preparing" ? (

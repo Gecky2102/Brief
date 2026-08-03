@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter};
 use crate::provider::{self, Request};
 use crate::settings;
 
-const MAX_OUTPUT_TOKENS: u32 = 2000;
+const MAX_OUTPUT_TOKENS: u32 = 4000;
 /// Oltre questa lunghezza la trascrizione viene riassunta a blocchi: i modelli
 /// hanno finestre ampie, ma un testo enorme fa perdere i dettagli.
 const CHUNK_CHARS: usize = 24_000;
@@ -21,6 +21,8 @@ pub struct Analysis {
     pub kind: String,
     pub title: String,
     pub summary: String,
+    #[serde(default)]
+    pub points: Vec<String>,
     pub decisions: Vec<String>,
     pub actions: Vec<String>,
     pub questions: Vec<String>,
@@ -40,22 +42,33 @@ Rispondi SOLO con righe etichettate, una per riga, in questo formato esatto:
 
 TIPO: <work_call|meeting|lecture|interview|casual>
 TITOLO: <massimo 8 parole>
-RIASSUNTO: <3-6 frasi su una sola riga>
-DECISIONE: <una decisione presa>
+RIASSUNTO: <resoconto disteso, vedi sotto>
+PUNTO: <un argomento trattato, spiegato in 2-3 frasi>
+DECISIONE: <una decisione presa e perché>
 AZIONE: <una cosa da fare, all'infinito, con il responsabile fra parentesi se emerge>
 DOMANDA: <una domanda rimasta aperta>
 
-Ripeti le righe DECISIONE, AZIONE e DOMANDA una volta per ciascuna voce, al massimo 8 per tipo, \
-tutte diverse fra loro. Ometti la riga se non hai nulla da dire. \
-Conserva i nomi propri di persone, aziende e strumenti così come compaiono. \
+Il RIASSUNTO deve essere lungo e sostanzioso: da 200 a 400 parole su una sola riga, \
+scritto in prosa scorrevole. Racconta come si è svolta la discussione, chi ha sostenuto \
+cosa, quali problemi concreti sono emersi, quali numeri, nomi, sistemi e scadenze sono \
+stati citati, e a che punto si è arrivati. Non limitarti a dire di cosa si è parlato: \
+spiega il contenuto, come faresti con un collega che non c'era. \
+Evita formule vaghe come «si è discusso di vari argomenti».
+
+Aggiungi una riga PUNTO per ogni argomento affrontato, da 4 a 10 righe, ciascuna con \
+qualche frase di sostanza. Ripeti allo stesso modo DECISIONE, AZIONE e DOMANDA, fino a 8 \
+voci ciascuna, tutte diverse. Ometti una riga solo se davvero non hai nulla da dire. \
+Conserva i nomi propri di persone, aziende, sistemi e prodotti così come compaiono. \
 La trascrizione è automatica e contiene errori di riconoscimento: ignora le parole \
-incomprensibili invece di inventarci sopra. Scrivi ogni parola in italiano. \
+incomprensibili invece di inventarci sopra, e non segnalarle. Scrivi ogni parola in italiano. \
 Non aggiungere altro testo oltre alle righe etichettate.";
 
 const SYSTEM_BLOCCO: &str = "Sei un assistente che riassume trascrizioni di riunioni in italiano. \
-Elenca in punti sintetici ciò che viene detto in questo estratto: argomenti trattati, \
-decisioni prese, cose da fare, domande rimaste aperte. \
-Conserva i nomi propri di persone, aziende, strumenti e prodotti così come compaiono. \
+Riporta in modo dettagliato ciò che viene detto in questo estratto: argomenti trattati, \
+posizioni espresse, problemi concreti emersi, decisioni prese, cose da fare, domande aperte. \
+Sii generoso nei dettagli: numeri, nomi di persone, aziende, sistemi, prodotti e scadenze \
+vanno conservati esattamente come compaiono, perché serviranno per la sintesi finale. \
+Non riassumere in due righe: usa un elenco puntato ricco, una voce per ogni cosa rilevante. \
 La trascrizione è automatica e contiene errori: ignora le parole incomprensibili invece di \
 inventarle. Rispondi solo con l'elenco puntato, scritto interamente in italiano.";
 
@@ -81,6 +94,7 @@ fn parse_labelled(raw: &str) -> Analysis {
             "TIPO" => analysis.kind = value.to_lowercase(),
             "TITOLO" => analysis.title = value,
             "RIASSUNTO" => analysis.summary = value,
+            "PUNTO" => push_unique(&mut analysis.points, value),
             "DECISIONE" => push_unique(&mut analysis.decisions, value),
             "AZIONE" => push_unique(&mut analysis.actions, value),
             "DOMANDA" => push_unique(&mut analysis.questions, value),
@@ -93,7 +107,7 @@ fn parse_labelled(raw: &str) -> Analysis {
 
 fn push_unique(list: &mut Vec<String>, value: String) {
     let normalized = value.to_lowercase();
-    if list.len() < 8 && !list.iter().any(|v| v.to_lowercase() == normalized) {
+    if list.len() < 10 && !list.iter().any(|v| v.to_lowercase() == normalized) {
         list.push(value);
     }
 }
@@ -278,7 +292,7 @@ Nota finale ignorata";
 
         let analysis = parse_labelled(&raw);
         assert_eq!(analysis.actions.len(), 1, "i doppioni vanno scartati");
-        assert_eq!(analysis.decisions.len(), 8, "al massimo otto voci");
+        assert_eq!(analysis.decisions.len(), 10, "al massimo dieci voci");
     }
 
     #[test]

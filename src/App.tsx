@@ -102,15 +102,15 @@ export default function App() {
 
   return (
     <div className="flex h-full">
-      <aside className="flex w-72 shrink-0 flex-col border-r border-edge">
-        <header className="space-y-3 px-4 pb-3 pt-10">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-edge">
+        <header className="brief-drag space-y-2.5 px-3 pb-2.5 pt-11">
           <div className="flex items-center justify-between">
-            <h1 className="text-sm font-semibold tracking-tight">Brief</h1>
+            <h1 className="text-[13px] font-semibold tracking-tight">Brief</h1>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setShowSettings(true)}
                 title="Impostazioni"
-                className="rounded-md border border-edge px-2 py-1 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
+                className="brief-button px-2 py-1 text-xs text-ink-muted hover:text-ink"
               >
                 ⚙
               </button>
@@ -119,7 +119,7 @@ export default function App() {
                   setShowSettings(false);
                   setSelectedId(null);
                 }}
-                className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+                className="brief-button-primary px-2.5 py-1 text-xs"
               >
                 Nuova
               </button>
@@ -130,7 +130,7 @@ export default function App() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Cerca nelle trascrizioni"
-            className="w-full rounded-md border border-edge bg-surface-raised px-2.5 py-1.5 text-xs outline-none placeholder:text-ink-muted"
+            className="brief-field w-full px-2.5 py-1.5 text-xs"
           />
         </header>
 
@@ -149,14 +149,18 @@ export default function App() {
                 setShowSettings(false);
                 setSelectedId(session.id);
               }}
-              className={`w-full rounded-md px-2 py-2 text-left transition-colors ${
+              className={`w-full rounded-md px-2.5 py-1.5 text-left transition-colors ${
                 session.id === selectedId
-                  ? "bg-surface-raised"
-                  : "hover:bg-surface-raised/60"
+                  ? "bg-accent text-white"
+                  : "hover:bg-surface-raised"
               }`}
             >
-              <span className="block truncate text-sm">{session.title}</span>
-              <span className="block text-xs text-ink-muted">
+              <span className="block truncate text-[13px]">{session.title}</span>
+              <span
+                className={`block text-[11px] ${
+                  session.id === selectedId ? "text-white/70" : "text-ink-muted"
+                }`}
+              >
                 {new Date(session.started_at).toLocaleDateString("it-IT", {
                   day: "numeric",
                   month: "short",
@@ -176,7 +180,7 @@ export default function App() {
         )}
       </aside>
 
-      <main className="flex-1 overflow-hidden pt-6">
+      <main className="brief-content flex-1 overflow-hidden">
         {showSettings ? (
           <SettingsPanel onClose={() => setShowSettings(false)} />
         ) : selected ? (

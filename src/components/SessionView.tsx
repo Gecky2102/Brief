@@ -186,12 +186,12 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <header className="space-y-3 border-b border-edge px-8 py-6">
+      <header className="brief-drag space-y-3 border-b border-edge px-8 pb-5 pt-12">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           onBlur={commitTitle}
-          className="w-full bg-transparent text-xl font-semibold outline-none"
+          className="w-full bg-transparent text-[22px] font-semibold tracking-tight outline-none"
         />
         <div className="flex flex-wrap items-center gap-3 text-xs text-ink-muted">
           <span>{new Date(session.started_at).toLocaleString("it-IT")}</span>
@@ -201,7 +201,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           <select
             value={session.kind}
             onChange={(event) => changeKind(event.target.value as SessionKind)}
-            className="rounded border border-edge bg-surface-raised px-2 py-1 text-xs text-ink outline-none"
+            className="brief-field px-2 py-1 text-xs text-ink"
           >
             {Object.entries(KIND_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -215,7 +215,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           <button
             onClick={runAnalysis}
             disabled={analyzing || segments.length === 0}
-            className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40"
+            className="brief-button-primary px-3 py-1.5 text-xs disabled:opacity-40"
           >
             {analyzing ? (
               <Spinner label="Analisi in corso…" />
@@ -227,19 +227,19 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           </button>
           <button
             onClick={copyToClipboard}
-            className="rounded-md border border-edge px-3 py-1.5 text-xs hover:bg-surface-raised"
+            className="brief-button px-3 py-1.5 text-xs"
           >
             Copia
           </button>
           <button
             onClick={saveMarkdown}
-            className="rounded-md border border-edge px-3 py-1.5 text-xs hover:bg-surface-raised"
+            className="brief-button px-3 py-1.5 text-xs"
           >
             Esporta Markdown
           </button>
           <button
             onClick={saveAudio}
-            className="rounded-md border border-edge px-3 py-1.5 text-xs hover:bg-surface-raised"
+            className="brief-button px-3 py-1.5 text-xs"
           >
             Esporta audio
           </button>
@@ -259,7 +259,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           ) : (
             <button
               onClick={() => setConfirmingDelete(true)}
-              className="rounded-md border border-edge px-3 py-1.5 text-xs text-ink-muted hover:border-live/50 hover:text-live"
+              className="brief-button px-3 py-1.5 text-xs text-ink-muted hover:text-live"
             >
               Elimina
             </button>

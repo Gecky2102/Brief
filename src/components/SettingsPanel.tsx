@@ -131,11 +131,11 @@ export default function SettingsPanel({ onClose }: Props) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <header className="flex items-center justify-between border-b border-edge px-8 py-5">
-        <h2 className="text-lg font-semibold">Impostazioni</h2>
+      <header className="brief-drag flex items-center justify-between border-b border-edge px-8 pb-4 pt-12">
+        <h2 className="text-[19px] font-semibold tracking-tight">Impostazioni</h2>
         <button
           onClick={onClose}
-          className="rounded-md border border-edge px-3 py-1.5 text-xs hover:bg-surface-raised"
+          className="brief-button px-3 py-1.5 text-xs"
         >
           Chiudi
         </button>
@@ -213,7 +213,7 @@ export default function SettingsPanel({ onClose }: Props) {
               }
               onBlur={() => save(settings)}
               placeholder="nome del modello"
-              className="w-full rounded-md border border-edge bg-surface-raised px-3 py-2 text-sm outline-none focus:border-accent"
+              className="brief-field w-full px-3 py-1.5 text-[13px]"
             />
           </label>
 
@@ -229,7 +229,7 @@ export default function SettingsPanel({ onClose }: Props) {
                 }
                 onBlur={() => save(settings)}
                 placeholder="https://esempio.com/v1"
-                className="w-full rounded-md border border-edge bg-surface-raised px-3 py-2 text-sm outline-none focus:border-accent"
+                className="brief-field w-full px-3 py-1.5 text-[13px]"
               />
             </label>
           )}
@@ -245,12 +245,12 @@ export default function SettingsPanel({ onClose }: Props) {
                 value={keyDraft}
                 onChange={(event) => setKeyDraft(event.target.value)}
                 placeholder={keyPresent ? "••••••••  (sostituisci)" : "incolla qui la chiave"}
-                className="flex-1 rounded-md border border-edge bg-surface-raised px-3 py-2 text-sm outline-none focus:border-accent"
+                className="brief-field flex-1 px-3 py-1.5 text-[13px]"
               />
               <button
                 onClick={saveKey}
                 disabled={!keyDraft.trim()}
-                className="rounded-md bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
+                className="brief-button-primary px-3 py-1.5 text-xs disabled:opacity-40"
               >
                 Salva
               </button>
@@ -297,7 +297,7 @@ export default function SettingsPanel({ onClose }: Props) {
                 {model.on_disk > 0 && (
                   <button
                     onClick={() => removeModel(model.file_name)}
-                    className="shrink-0 rounded-md border border-edge px-2.5 py-1 text-[11px] text-ink-muted hover:border-live/50 hover:text-live"
+                    className="brief-button shrink-0 px-2.5 py-1 text-[11px] text-ink-muted hover:text-live"
                   >
                     Elimina
                   </button>
