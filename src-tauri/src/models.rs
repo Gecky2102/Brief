@@ -90,25 +90,67 @@ pub fn ensure(app: &AppHandle, spec: &ModelSpec) -> Result<PathBuf, String> {
     }
 
     let temporary = destination.with_extension("part");
-    let response = ureq::get(spec.url)
+
+    // Un modello può pesare gigabyte: se un tentativo precedente si è
+    // interrotto si riparte da dove era arrivato, non da capo.
+    let already = std::fs::metadata(&temporary)
+        .map(|meta| meta.len())
+        .unwrap_or(0);
+
+    let mut hasher = Sha256::new();
+    let mut downloaded = 0_u64;
+
+    if already > 0 && already < spec.bytes {
+        // L'hash si calcola sull'intero file: la parte già scaricata va
+        // ripassata nell'hasher prima di riprendere.
+        let mut existing = std::fs::File::open(&temporary)
+            .map_err(|cause| format!("Ripresa del download fallita: {cause}"))?;
+        let mut buffer = vec![0_u8; 1 << 20];
+        loop {
+            let read = existing
+                .read(&mut buffer)
+                .map_err(|cause| format!("Ripresa del download fallita: {cause}"))?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+            downloaded += read as u64;
+        }
+    } else if already >= spec.bytes {
+        let _ = std::fs::remove_file(&temporary);
+    }
+
+    let mut request = ureq::get(spec.url);
+    if downloaded > 0 {
+        request = request.header("Range", &format!("bytes={downloaded}-"));
+    }
+
+    let response = request
         .call()
         .map_err(|cause| format!("Download di «{}» fallito: {cause}", spec.label))?;
 
-    let total = response
-        .headers()
-        .get("content-length")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(spec.bytes);
+    // Se il server ignora la richiesta di ripresa si ricomincia da zero.
+    let resuming = response.status().as_u16() == 206;
+    if downloaded > 0 && !resuming {
+        hasher = Sha256::new();
+        downloaded = 0;
+    }
+
+    let total = spec.bytes;
 
     let mut reader = response.into_body().into_reader();
-    let mut file = std::fs::File::create(&temporary)
-        .map_err(|cause| format!("Impossibile scrivere il modello: {cause}"))?;
+    let mut file = if resuming {
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&temporary)
+            .map_err(|cause| format!("Impossibile scrivere il modello: {cause}"))?
+    } else {
+        std::fs::File::create(&temporary)
+            .map_err(|cause| format!("Impossibile scrivere il modello: {cause}"))?
+    };
 
-    let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 1 << 20];
-    let mut downloaded: u64 = 0;
-    let mut last_reported: u64 = 0;
+    let mut last_reported: u64 = downloaded;
 
     loop {
         let read = reader
