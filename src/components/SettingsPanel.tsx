@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Spinner from "./Spinner";
+import { MODELS, REPORT_LENGTHS, REPORT_STYLES } from "../lib/catalog";
 import {
   deleteModel,
   getSettings,
@@ -9,6 +10,8 @@ import {
   storageReport,
   type Provider,
   type Quality,
+  type ReportLength,
+  type ReportStyle,
   type Settings,
   type StorageReport,
 } from "../lib/recorder";
@@ -204,18 +207,38 @@ export default function SettingsPanel({ onClose }: Props) {
             <p className="text-[11px] text-ink-muted">{provider.hint}</p>
           )}
 
-          <label className="block space-y-1.5">
+          <div className="space-y-1.5">
             <span className="text-xs text-ink-muted">Modello</span>
+            {MODELS[settings.provider].length > 0 && (
+              <div className="space-y-1">
+                {MODELS[settings.provider].map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => save({ ...settings, model: model.id })}
+                    className={`flex w-full items-baseline gap-2 rounded-lg border px-3 py-1.5 text-left transition-colors ${
+                      settings.model === model.id
+                        ? "border-accent bg-accent-soft"
+                        : "border-edge hover:bg-surface-raised"
+                    }`}
+                  >
+                    <span className="text-xs font-medium">{model.id}</span>
+                    <span className="text-[11px] text-ink-muted">
+                      {model.note}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             <input
               value={settings.model}
               onChange={(event) =>
                 setLocalSettings({ ...settings, model: event.target.value })
               }
               onBlur={() => save(settings)}
-              placeholder="nome del modello"
+              placeholder="oppure scrivi il nome di un altro modello"
               className="brief-field w-full px-3 py-1.5 text-[13px]"
             />
-          </label>
+          </div>
 
           {settings.provider === "compatible" && (
             <label className="block space-y-1.5">
@@ -259,6 +282,76 @@ export default function SettingsPanel({ onClose }: Props) {
               Salvata in un file leggibile solo dal tuo utente, dentro la
               cartella dati di Brief.
             </span>
+          </label>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-medium">Taglio del report</h3>
+            <p className="text-xs text-ink-muted">
+              Vale per i report generati d'ora in poi.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {REPORT_STYLES.map((option) => (
+              <button
+                key={option.value}
+                onClick={() =>
+                  save({ ...settings, report_style: option.value as ReportStyle })
+                }
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  settings.report_style === option.value
+                    ? "border-accent bg-accent-soft"
+                    : "border-edge hover:bg-surface-raised"
+                }`}
+              >
+                <span className="block text-xs font-medium">{option.label}</span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-ink-muted">
+                  {option.detail}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            {REPORT_LENGTHS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() =>
+                  save({
+                    ...settings,
+                    report_length: option.value as ReportLength,
+                  })
+                }
+                className={`flex-1 rounded-lg border px-3 py-2 text-center transition-colors ${
+                  settings.report_length === option.value
+                    ? "border-accent bg-accent-soft"
+                    : "border-edge hover:bg-surface-raised"
+                }`}
+              >
+                <span className="block text-xs font-medium">{option.label}</span>
+                <span className="block text-[11px] text-ink-muted">
+                  {option.detail}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs text-ink-muted">
+              Istruzioni aggiuntive (facoltative)
+            </span>
+            <textarea
+              value={settings.report_notes}
+              onChange={(event) =>
+                setLocalSettings({ ...settings, report_notes: event.target.value })
+              }
+              onBlur={() => save(settings)}
+              rows={2}
+              placeholder="es. dai sempre risalto alle scadenze, oppure scrivi in terza persona"
+              className="brief-field w-full resize-none px-3 py-1.5 text-[13px]"
+            />
           </label>
         </section>
 

@@ -67,11 +67,26 @@ export type Provider =
   | "openrouter"
   | "compatible";
 
+export type ReportStyle =
+  | "auto"
+  | "meeting"
+  | "executive"
+  | "lecture"
+  | "interview"
+  | "standup"
+  | "brainstorm"
+  | "minutes";
+
+export type ReportLength = "brief" | "standard" | "deep";
+
 export type Settings = {
   quality: Quality;
   provider: Provider;
   model: string;
   base_url: string;
+  report_style: ReportStyle;
+  report_length: ReportLength;
+  report_notes: string;
 };
 
 export type ModelStatus = {

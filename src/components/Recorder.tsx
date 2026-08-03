@@ -254,7 +254,38 @@ export default function Recorder({ onFinished }: Props) {
     recording && lines.length === 0 && Date.now() - lastSpeechMs.current < 60000;
 
   return (
-    <div className="brief-drag flex h-full w-full flex-col items-center gap-7 overflow-y-auto px-8 pb-10 pt-14">
+    <div className="relative flex h-full w-full flex-col">
+      {/* Resta agganciata in alto mentre la trascrizione scorre: altrimenti
+          l'avanzamento sparisce appena il testo cresce. */}
+      {importing && (
+        <div className="sticky top-0 z-10 border-b border-edge bg-surface-raised/95 px-6 py-2.5 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl items-center gap-3">
+            <Spinner />
+            <div className="flex-1">
+              <div className="mb-1 flex items-baseline justify-between text-[11px]">
+                <span>Trascrizione in corso</span>
+                <span className="text-ink-muted">
+                  {formatClock(importing.done)} di {formatClock(importing.total)}
+                  {importing.eta > 0 && ` · ${formatClock(importing.eta)} rimanenti`}
+                </span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-surface-sunken">
+                <div
+                  className="h-full rounded-full bg-accent transition-[width] duration-300"
+                  style={{
+                    width: `${Math.round((importing.done / Math.max(importing.total, 1)) * 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <span className="w-12 text-right text-lg font-light tabular-nums">
+              {Math.round((importing.done / Math.max(importing.total, 1)) * 100)}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="brief-drag flex w-full flex-1 flex-col items-center gap-7 overflow-y-auto px-8 pb-10 pt-14">
       <div className="flex flex-col items-center gap-5">
         <div className="flex items-center gap-3">
           {recording && (
@@ -407,6 +438,7 @@ export default function Recorder({ onFinished }: Props) {
           {error}
         </p>
       )}
+      </div>
     </div>
   );
 }

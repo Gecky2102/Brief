@@ -224,3 +224,33 @@ textarea::placeholder {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+
+/* Numerazione automatica delle sezioni: dà al documento l'aspetto di un
+   report impaginato invece che di una pagina web. */
+.brief-report {
+  counter-reset: sezione;
+}
+.brief-report h2 {
+  counter-increment: sezione;
+  counter-reset: sottosezione;
+}
+.brief-report h2::before {
+  content: counter(sezione) ".";
+  margin-right: 0.5em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.brief-report h3 {
+  counter-increment: sottosezione;
+}
+.brief-report h3::before {
+  content: counter(sezione) "." counter(sottosezione);
+  margin-right: 0.5em;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.brief-report table tr:hover td {
+  background-color: var(--surface-sunken);
+}

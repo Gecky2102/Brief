@@ -6,7 +6,6 @@ use crate::settings;
 
 /// Un report di 1500-3000 parole richiede spazio: con un tetto basso il
 /// documento veniva troncato a metà.
-const REPORT_TOKENS: u32 = 16_000;
 const NOTES_TOKENS: u32 = 2_000;
 /// Oltre questa lunghezza la trascrizione viene riassunta a blocchi: i modelli
 /// hanno finestre ampie, ma un testo enorme fa perdere i dettagli.
@@ -39,50 +38,108 @@ pub struct AnalysisProgress {
     preview: String,
 }
 
-const SYSTEM_REPORT: &str = "Sei un analista che redige report professionali in italiano \
-a partire da trascrizioni di riunioni, lezioni e conversazioni di lavoro.
+/// Struttura del documento in base al taglio scelto. Ogni taglio chiede sezioni
+/// diverse: un verbale non somiglia a una sintesi per la direzione.
+fn struttura(style: settings::ReportStyle) -> &'static str {
+    use settings::ReportStyle::*;
+    match style {
+        Auto | Meeting => "## Quadro generale\nContesto, partecipanti con i nomi che compaiono, scopo dell'incontro, come si è svolto.\n\n## <un titolo per ciascun tema affrontato>\nUna sezione per ogni argomento di sostanza, in ordine di importanza. Spiega il problema, le posizioni emerse, i dettagli tecnici, i numeri, i sistemi e gli strumenti citati. Usa sottosezioni, elenchi e tabelle dove aiutano.\n\n## Decisioni prese\nTabella | Decisione | Motivazione | Chi decide |\n\n## Attivita da svolgere\nTabella | Attivita | Responsabile | Scadenza |\n\n## Punti aperti\nQuestioni irrisolte, ciascuna con una riga di contesto.\n\n## Rischi e criticita\nOstacoli, dipendenze e problemi segnalati.",
 
-Produci un documento in Markdown, lungo e approfondito: da 1500 a 3000 parole. \
-Non è un riassunto, è un documento di lavoro che una persona assente deve poter leggere \
-al posto di aver partecipato.
+        Executive => "## In sintesi\nCinque righe che dicono l'essenziale a chi ha due minuti.\n\n## Situazione\nContesto e problema di fondo, senza tecnicismi.\n\n## Decisioni e implicazioni\nTabella | Decisione | Impatto | Chi decide |\n\n## Cosa serve ora\nTabella | Azione | Responsabile | Entro quando |\n\n## Rischi\nI tre o quattro rischi che contano davvero, con la loro gravita.\n\n## Approfondimento\nIl dettaglio per chi vuole andare a fondo, organizzato per tema.",
+
+        Lecture => "## Argomento della lezione\nDi cosa tratta e come si inserisce nel percorso.\n\n## <un titolo per ciascun concetto spiegato>\nUna sezione per concetto: definizione, spiegazione distesa, esempi fatti a lezione, formule o passaggi se ci sono.\n\n## Definizioni\nTabella | Termine | Significato |\n\n## Esempi ed esercizi\nGli esempi svolti, con il ragionamento seguito.\n\n## Da studiare\nCosa e stato assegnato o consigliato.\n\n## Punti da chiarire\nCio che e rimasto oscuro o e stato rimandato.",
+
+        Interview => "## Profilo\nChi e l'intervistato, ruolo, contesto dell'intervista.\n\n## <un titolo per ciascun tema toccato>\nUna sezione per tema, con le posizioni espresse e le motivazioni addotte. Riporta fra virgolette i passaggi piu significativi.\n\n## Citazioni rilevanti\nLe frasi che meritano di essere riportate testualmente.\n\n## Fatti e cifre\nTabella | Dato | Contesto |\n\n## Domande rimaste senza risposta\nCio su cui non si e arrivati in fondo.",
+
+        Standup => "## In breve\nTre righe sullo stato complessivo.\n\n## Per persona\nUna sezione per partecipante: fatto, in corso, bloccato da.\n\n## Impedimenti\nTabella | Impedimento | Chi e bloccato | Chi puo sbloccare |\n\n## Attivita da svolgere\nTabella | Attivita | Responsabile | Entro quando |\n\n## Note\nTutto il resto che vale la pena ricordare.",
+
+        Brainstorm => "## Obiettivo della sessione\nQual era la domanda di partenza.\n\n## Idee emerse\nUna sezione per idea o famiglia di idee: in cosa consiste, chi l'ha proposta, obiezioni e sviluppi.\n\n## Confronto\nTabella | Idea | A favore | Contro |\n\n## Direzioni promettenti\nSu cosa vale la pena insistere e perche.\n\n## Da approfondire\nCosa va verificato prima di decidere.",
+
+        Minutes => "## Intestazione\nData, ora, luogo se emerge, presenti con i nomi che compaiono.\n\n## Ordine del giorno\nI punti trattati, nell'ordine in cui sono stati affrontati.\n\n## Svolgimento\nUna sezione per punto, con il resoconto fedele della discussione: interventi, posizioni, obiezioni.\n\n## Deliberazioni\nTabella | Punto | Decisione | Esito |\n\n## Impegni assunti\nTabella | Impegno | Chi | Entro quando |\n\n## Chiusura\nCome si e conclusa la seduta e cosa e stato rinviato.",
+    }
+}
+
+fn lunghezza(length: settings::ReportLength) -> &'static str {
+    use settings::ReportLength::*;
+    match length {
+        Brief => "da 600 a 1000 parole",
+        Standard => "da 1500 a 3000 parole",
+        Deep => "da 3500 a 6000 parole, entrando nel dettaglio di ogni passaggio",
+    }
+}
+
+fn tokens_per(length: settings::ReportLength) -> u32 {
+    use settings::ReportLength::*;
+    match length {
+        Brief => 6_000,
+        Standard => 16_000,
+        Deep => 32_000,
+    }
+}
+
+fn build_report_prompt(settings: &settings::Settings, kind: &str) -> String {
+    // Con «Auto» il taglio viene dal tipo riconosciuto nella trascrizione.
+    let style = if settings.report_style == settings::ReportStyle::Auto {
+        match kind {
+            "lecture" => settings::ReportStyle::Lecture,
+            "interview" => settings::ReportStyle::Interview,
+            "casual" => settings::ReportStyle::Brainstorm,
+            _ => settings::ReportStyle::Meeting,
+        }
+    } else {
+        settings.report_style
+    };
+
+    let extra = if settings.report_notes.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n\nIstruzioni aggiuntive di chi legge, da rispettare:\n{}",
+            settings.report_notes.trim()
+        )
+    };
+
+    format!(
+        "Sei un analista che redige documenti professionali in italiano a partire da \
+trascrizioni di riunioni, lezioni e conversazioni di lavoro.
+
+Produci un documento in Markdown, {}. Non e un riassunto: e un documento di lavoro che \
+una persona assente deve poter leggere al posto di aver partecipato.
 
 Struttura da seguire, adattandola al contenuto reale:
 
 # <titolo del documento>
 
-## Quadro generale
-Contesto, partecipanti (con i nomi che compaiono), scopo dell'incontro, come si è svolto.
+{}
 
-## <un titolo per ciascun tema affrontato>
-Una sezione per ogni argomento di sostanza, in ordine di importanza. Dentro ogni sezione \
-spiega il problema, le posizioni emerse, i dettagli tecnici, i numeri, i sistemi e gli \
-strumenti citati. Usa sottosezioni, elenchi puntati e tabelle dove aiutano a leggere.
+Regole di scrittura:
+- Prosa distesa e professionale, mai telegrafica. Ogni sezione ha almeno due paragrafi \
+  di sostanza, non un elenco secco.
+- Conserva nomi di persone, aziende, sistemi, prodotti, cifre e date esattamente come compaiono.
+- Usa **grassetto** per i termini chiave, tabelle per i dati strutturati, elenchi solo \
+  quando l'informazione e davvero una lista.
+- Dove un'informazione non emerge dalla trascrizione scrivi «non indicato», senza inventare.
+- La trascrizione e automatica e contiene errori di riconoscimento: ignora le parole \
+  incomprensibili senza segnalarle e senza costruirci sopra ipotesi.
+- Niente premesse, scuse o commenti sul tuo lavoro: produci solo il documento.{}",
+        lunghezza(settings.report_length),
+        struttura(style),
+        extra
+    )
+}
 
-## Decisioni prese
-Tabella con le colonne | Decisione | Motivazione | Chi decide |
+const SYSTEM_CLASSIFICA: &str = "Leggi la trascrizione e rispondi con una sola riga:
 
-## Attività da svolgere
-Tabella con le colonne | Attività | Responsabile | Scadenza |
-Se una informazione non emerge dalla trascrizione scrivi «non indicato».
+TIPO: <work_call|meeting|lecture|interview|casual>
 
-## Punti aperti
-Elenco delle questioni rimaste irrisolte, ciascuna con una riga di contesto.
-
-## Rischi e criticità
-Ostacoli, dipendenze e problemi segnalati durante la discussione.
-
-Regole: scrivi in italiano corretto e professionale, in prosa distesa, non telegrafica. \
-Conserva nomi di persone, aziende, sistemi, prodotti, cifre e date esattamente come compaiono. \
-La trascrizione è automatica e contiene errori di riconoscimento: ignora le parole \
-incomprensibili senza segnalarle e senza inventarci sopra. \
-Non aggiungere premesse, scuse o commenti sul tuo lavoro: produci solo il documento.";
+Nient'altro.";
 
 const SYSTEM_BLOCCO: &str = "Sei un assistente che prende appunti dettagliati da trascrizioni \
-di riunioni in italiano. Riporta tutto ciò che di rilevante viene detto in questo estratto: \
+di riunioni in italiano. Riporta tutto cio che di rilevante viene detto in questo estratto: \
 argomenti, posizioni espresse, problemi concreti, dettagli tecnici, decisioni, cose da fare, \
 domande aperte. Conserva nomi di persone, aziende, sistemi, prodotti, cifre e date esattamente \
 come compaiono: serviranno per il report finale. Non sintetizzare troppo: questi appunti \
-sostituiscono la trascrizione originale. La trascrizione è automatica e contiene errori: \
+sostituiscono la trascrizione originale. La trascrizione e automatica e contiene errori: \
 ignora le parole incomprensibili invece di inventarle. Rispondi con un elenco puntato in italiano.";
 
 const SYSTEM_INTESTAZIONE: &str = "Leggi il report e rispondi con tre righe etichettate, \
@@ -215,8 +272,29 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
 
     let transcript = render_transcript(&lines);
 
+    // Riconosce il tipo di conversazione prima di scrivere: il taglio del
+    // documento dipende da quello, e con «Auto» è l'unico modo per sceglierlo.
+    let mut kind = "meeting".to_string();
+    if let Ok(risposta) = session.ask(
+        SYSTEM_CLASSIFICA,
+        &transcript.chars().take(4000).collect::<String>(),
+        "reading",
+        0,
+        1,
+        30,
+    ) {
+        let mut provvisoria = Analysis::default();
+        parse_header(&risposta, &mut provvisoria);
+        if !provvisoria.kind.is_empty() {
+            kind = provvisoria.kind;
+        }
+    }
+
+    let system_report = build_report_prompt(&session.settings, &kind);
+    let report_tokens = tokens_per(session.settings.report_length);
+
     let report = if transcript.chars().count() <= SINGLE_PASS_CHARS {
-        session.ask(SYSTEM_REPORT, &transcript, "writing", 0, 1, REPORT_TOKENS)?
+        session.ask(&system_report, &transcript, "writing", 0, 1, report_tokens)?
     } else {
         // Prima note dettagliate blocco per blocco, poi il documento finale:
         // così nessuna parte della riunione resta fuori dal report.
@@ -242,14 +320,12 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
         }
 
         session.ask(
-            SYSTEM_REPORT,
-            &format!(
-                "Note prese durante la riunione, in ordine cronologico:\n\n{parziali}"
-            ),
+            &system_report,
+            &format!("Note prese durante la riunione, in ordine cronologico:\n\n{parziali}"),
             "writing",
             totale,
             totale + 1,
-            REPORT_TOKENS,
+            report_tokens,
         )?
     };
 
@@ -260,7 +336,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
     // Intestazione a parte: chiedere titolo e tipo insieme al documento faceva
     // sprecare al modello l'inizio della risposta.
     let mut analysis = Analysis {
-        kind: "unknown".into(),
+        kind: kind.clone(),
         title: title_from_report(&report),
         summary: String::new(),
         report: report.clone(),

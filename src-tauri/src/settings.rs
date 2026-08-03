@@ -17,6 +17,32 @@ pub enum Quality {
     Accurate,
 }
 
+/// Taglio del report. `Auto` lascia che sia il modello a riconoscere di che
+/// tipo di conversazione si tratta e ad adattare il documento.
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ReportStyle {
+    #[default]
+    Auto,
+    Meeting,
+    Executive,
+    Lecture,
+    Interview,
+    Standup,
+    Brainstorm,
+    Minutes,
+}
+
+/// Quanto deve essere lungo il documento.
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ReportLength {
+    Brief,
+    #[default]
+    Standard,
+    Deep,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -25,6 +51,10 @@ pub struct Settings {
     pub model: String,
     /// Vuoto significa «usa l'indirizzo predefinito del fornitore».
     pub base_url: String,
+    pub report_style: ReportStyle,
+    pub report_length: ReportLength,
+    /// Istruzioni aggiuntive dell'utente, aggiunte in coda al prompt.
+    pub report_notes: String,
 }
 
 impl Default for Settings {
@@ -35,6 +65,9 @@ impl Default for Settings {
             model: provider.default_model().to_string(),
             provider,
             base_url: String::new(),
+            report_style: ReportStyle::default(),
+            report_length: ReportLength::default(),
+            report_notes: String::new(),
         }
     }
 }
