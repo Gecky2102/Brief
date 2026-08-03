@@ -179,10 +179,20 @@ export default function App() {
 
         <nav className="flex-1 overflow-y-auto px-2 pb-2">
           {sessions.length === 0 && (
-            <p className="px-2 py-8 text-center text-xs leading-relaxed text-ink-muted">
-              {query.trim()
-                ? "Nessun risultato."
-                : "Nessuna sessione registrata."}
+            <p className="px-3 py-10 text-center text-xs leading-relaxed text-ink-muted">
+              {query.trim() ? (
+                <>
+                  Nessuna riga contiene «{query.trim()}».
+                  <br />
+                  La ricerca guarda dentro le trascrizioni, non solo nei titoli.
+                </>
+              ) : (
+                <>
+                  Nessuna sessione.
+                  <br />
+                  Registra qualcosa oppure importa un file audio.
+                </>
+              )}
             </p>
           )}
           {sessions.map((session, indice) => {

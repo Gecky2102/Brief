@@ -91,6 +91,25 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
 
   useEffect(load, [load]);
 
+  // ⌘R rigenera, ⌘P stampa, ⌘⇧C copia: le tre azioni che si ripetono di più.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!event.metaKey) return;
+      if (event.key === "r") {
+        event.preventDefault();
+        if (!analyzing && segments.length > 0) void runAnalysis();
+      } else if (event.key === "p") {
+        event.preventDefault();
+        if (analysis?.report) stampaReport();
+      } else if (event.shiftKey && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        void copyToClipboard();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   useEffect(() => {
     const subscriptions = [
       onDownloadProgress((event) =>
@@ -263,9 +282,9 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             {analyzing ? (
               <Spinner label="Scrittura in corso…" />
             ) : analysis ? (
-              "Rigenera report"
+              "Rigenera report ⌘R"
             ) : (
-              "Genera report"
+              "Genera report ⌘R"
             )}
           </button>
           <button
@@ -279,7 +298,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             disabled={!analysis?.report}
             className="brief-button px-3 py-1.5 text-xs disabled:opacity-40"
           >
-            Esporta PDF
+            Esporta PDF ⌘P
           </button>
           <button
             onClick={copyToClipboard}
