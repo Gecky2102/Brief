@@ -10,6 +10,7 @@ import {
   revealDataFolder,
   storageReport,
   testProvider,
+  verifyModel,
   type Provider,
   type Quality,
   type ReportLength,
@@ -81,6 +82,7 @@ export default function SettingsPanel({ onClose }: Props) {
   const [storage, setStorage] = useState<StorageReport | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [checking, setChecking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshStorage = useCallback(() => {
@@ -126,6 +128,26 @@ export default function SettingsPanel({ onClose }: Props) {
       setError(String(cause));
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function verifica(fileName: string, label: string) {
+    setChecking(fileName);
+    setError(null);
+    setNotice(null);
+    try {
+      const integro = await verifyModel(fileName);
+      if (integro) {
+        setNotice(`${label}: file integro.`);
+      } else {
+        setError(
+          `${label}: il file non corrisponde all'originale. Eliminalo e verrà riscaricato.`,
+        );
+      }
+    } catch (cause: unknown) {
+      setError(String(cause));
+    } finally {
+      setChecking(null);
     }
   }
 
@@ -473,6 +495,15 @@ export default function SettingsPanel({ onClose }: Props) {
                         : `scaricato a metà · ${formatBytes(model.on_disk)} di ${formatBytes(model.bytes)}`}
                   </span>
                 </div>
+                {model.complete && (
+                  <button
+                    onClick={() => verifica(model.file_name, model.label)}
+                    disabled={checking !== null}
+                    className="brief-button shrink-0 px-2.5 py-1 text-[11px] text-ink-muted disabled:opacity-40"
+                  >
+                    {checking === model.file_name ? "Verifico…" : "Verifica"}
+                  </button>
+                )}
                 {model.on_disk > 0 && (
                   <button
                     onClick={() => removeModel(model.file_name)}

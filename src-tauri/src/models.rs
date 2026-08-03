@@ -281,6 +281,47 @@ fn free_space(path: &std::path::Path) -> Option<u64> {
     Some(stats.f_bavail as u64 * stats.f_frsize as u64)
 }
 
+/// Ricontrolla l'hash di un modello già presente: un file corrotto da un
+/// disco pieno o da un'interruzione produce errori incomprensibili al primo uso.
+#[tauri::command]
+pub async fn verify_model(app: AppHandle, file_name: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let spec = ALL
+            .iter()
+            .find(|spec| spec.file_name == file_name)
+            .ok_or_else(|| "Modello sconosciuto.".to_string())?;
+
+        let path = models_dir(&app)?.join(spec.file_name);
+        if !path.exists() {
+            return Ok(false);
+        }
+
+        let mut file = std::fs::File::open(&path)
+            .map_err(|cause| format!("Modello non leggibile: {cause}"))?;
+        let mut hasher = Sha256::new();
+        let mut buffer = vec![0_u8; 1 << 20];
+        loop {
+            let letti = file
+                .read(&mut buffer)
+                .map_err(|cause| format!("Lettura interrotta: {cause}"))?;
+            if letti == 0 {
+                break;
+            }
+            hasher.update(&buffer[..letti]);
+        }
+
+        let digest = hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+
+        Ok(digest == spec.sha256)
+    })
+    .await
+    .map_err(|cause| format!("Verifica interrotta: {cause}"))?
+}
+
 /// Elimina un modello scaricato, o il residuo di un download interrotto.
 #[tauri::command]
 pub fn delete_model(app: AppHandle, file_name: String) -> Result<(), String> {

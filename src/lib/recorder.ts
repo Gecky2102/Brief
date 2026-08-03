@@ -142,6 +142,10 @@ export function storageReport(): Promise<StorageReport> {
   return invoke<StorageReport>("storage_report");
 }
 
+export function verifyModel(fileName: string): Promise<boolean> {
+  return invoke<boolean>("verify_model", { fileName });
+}
+
 export function deleteModel(fileName: string): Promise<void> {
   return invoke<void>("delete_model", { fileName });
 }

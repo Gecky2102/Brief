@@ -62,7 +62,8 @@ pub fn run() {
             settings::set_api_key,
             settings::test_provider,
             models::storage_report,
-            models::delete_model
+            models::delete_model,
+            models::verify_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
