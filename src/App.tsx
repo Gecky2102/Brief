@@ -11,7 +11,9 @@ import {
   type SearchHit,
   type Session,
 } from "./lib/db";
-import { deleteRecording } from "./lib/recorder";
+import { deleteRecording, exportMany } from "./lib/recorder";
+import { listSegments, loadAnalysis } from "./lib/db";
+import { fileNameFor, toMarkdown } from "./lib/markdown";
 
 /// Raggruppa per periodo come fanno Foto e Note: scorrere una lista piatta di
 /// cento sessioni è scomodo.
@@ -60,6 +62,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [ready, setReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -124,6 +127,30 @@ export default function App() {
     (sum, session) => sum + session.duration_ms,
     0,
   );
+
+  /// Esporta in blocco quanto è attualmente in elenco: con la ricerca attiva
+  /// diventa «esporta tutto ciò che parla di X».
+  async function esportaTutte() {
+    setExporting(true);
+    try {
+      const documenti: [string, string][] = [];
+      for (const session of sessions) {
+        const [segments, analysis] = await Promise.all([
+          listSegments(session.id),
+          loadAnalysis(session.id),
+        ]);
+        documenti.push([
+          fileNameFor(session),
+          toMarkdown(session, segments, analysis),
+        ]);
+      }
+      await exportMany(documenti);
+    } catch (cause: unknown) {
+      setError(String(cause));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function removeSelected(session: Session) {
     if (session.audio_path) {
@@ -246,10 +273,20 @@ export default function App() {
         </nav>
 
         {sessions.length > 0 && (
-          <footer className="border-t border-edge px-4 py-2.5 text-[11px] text-ink-muted">
-            {sessions.length}{" "}
-            {sessions.length === 1 ? "sessione" : "sessioni"} ·{" "}
-            {Math.round(totalMs / 60000)} min registrati
+          <footer className="flex items-center justify-between gap-2 border-t border-edge px-3 py-2 text-[11px] text-ink-muted">
+            <span>
+              {sessions.length}{" "}
+              {sessions.length === 1 ? "sessione" : "sessioni"} ·{" "}
+              {Math.round(totalMs / 60000)} min
+            </span>
+            <button
+              onClick={esportaTutte}
+              disabled={exporting}
+              className="brief-button px-2 py-0.5 text-[11px] disabled:opacity-40"
+              title="Salva tutte le sessioni in elenco come file Markdown"
+            >
+              {exporting ? "Esporto…" : "Esporta"}
+            </button>
           </footer>
         )}
       </aside>

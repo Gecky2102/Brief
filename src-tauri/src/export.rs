@@ -70,6 +70,40 @@ fn compress_blocking(app: AppHandle, directory: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Salva più documenti in una cartella scelta una volta sola: esportare venti
+/// sessioni una per una, con una finestra di dialogo ciascuna, è impraticabile.
+#[tauri::command]
+pub async fn export_many(
+    app: AppHandle,
+    files: Vec<(String, String)>,
+) -> Result<u32, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(target) = app.dialog().file().blocking_pick_folder() else {
+            return Ok(0);
+        };
+        let target = target
+            .into_path()
+            .map_err(|cause| format!("Percorso non valido: {cause}"))?;
+
+        let mut scritti = 0;
+        for (nome, contenuto) in files {
+            let sicuro: String = nome
+                .chars()
+                .filter(|c| !matches!(c, '/' | '\\' | ':'))
+                .collect();
+            if sicuro.trim().is_empty() {
+                continue;
+            }
+            std::fs::write(target.join(&sicuro), contenuto)
+                .map_err(|cause| format!("Scrittura non riuscita: {cause}"))?;
+            scritti += 1;
+        }
+        Ok(scritti)
+    })
+    .await
+    .map_err(|cause| format!("Esportazione interrotta: {cause}"))?
+}
+
 #[tauri::command]
 pub async fn export_markdown(
     app: AppHandle,

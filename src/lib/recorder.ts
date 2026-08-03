@@ -190,6 +190,10 @@ export function exportMarkdown(
   return invoke<boolean>("export_markdown", { fileName, contents });
 }
 
+export function exportMany(files: [string, string][]): Promise<number> {
+  return invoke<number>("export_many", { files });
+}
+
 export function exportAudio(directory: string): Promise<boolean> {
   return invoke<boolean>("export_audio", { directory });
 }
