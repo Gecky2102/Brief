@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import LevelMeter from "./LevelMeter";
 import Spinner from "./Spinner";
 import Welcome from "./Welcome";
-import { addSegment, createSession, finishSession } from "../lib/db";
+import { addSegment, archiveStats, createSession, finishSession } from "../lib/db";
 import { speakerOf } from "../lib/markdown";
 import {
   compressRecording,
@@ -56,6 +56,12 @@ export default function Recorder({ onFinished }: Props) {
   const [analysisReady, setAnalysisReady] = useState(true);
   const [settings, setLocalSettings] = useState<Settings | null>(null);
   const [dismissedWelcome, setDismissedWelcome] = useState(false);
+  const [stats, setStats] = useState<{
+    sessions: number;
+    minutes: number;
+    words: number;
+    reports: number;
+  } | null>(null);
   const [systemWarning, setSystemWarning] = useState<string | null>(null);
   const [importing, setImporting] = useState<{
     done: number;
@@ -81,6 +87,7 @@ export default function Recorder({ onFinished }: Props) {
       })
       .catch(() => setModelReady(false));
     getSettings().then(setLocalSettings).catch(() => undefined);
+    archiveStats().then(setStats).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -330,6 +337,22 @@ export default function Recorder({ onFinished }: Props) {
         <p className="text-xs text-ink-muted">
           {recording ? "Barra spaziatrice per fermare" : "Barra spaziatrice per avviare"}
         </p>
+
+        {stats && stats.sessions > 0 && lines.length === 0 && !recording && !busy && (
+          <div className="flex gap-6 pt-2 text-center">
+            {[
+              [stats.sessions, stats.sessions === 1 ? "sessione" : "sessioni"],
+              [stats.minutes, "minuti"],
+              [Math.round(stats.words / 1000), "mila parole"],
+              [stats.reports, stats.reports === 1 ? "report" : "report"],
+            ].map(([valore, etichetta]) => (
+              <span key={String(etichetta)} className="flex flex-col">
+                <span className="text-lg font-light tabular-nums">{valore}</span>
+                <span className="text-[11px] text-ink-muted">{etichetta}</span>
+              </span>
+            ))}
+          </div>
+        )}
 
         {lines.length > 0 && !recording && !busy && (
           <span className="text-xs text-ink-muted">

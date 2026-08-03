@@ -274,6 +274,27 @@ export async function setSessionTitle(
   ]);
 }
 
+/// Statistiche complessive dell'archivio, per la schermata iniziale.
+export async function archiveStats(): Promise<{
+  sessions: number;
+  minutes: number;
+  words: number;
+  reports: number;
+}> {
+  const conn = await db();
+  const righe = await conn.select<
+    { sessions: number; minutes: number; words: number; reports: number }[]
+  >(
+    `SELECT
+       (SELECT COUNT(*) FROM sessions) AS sessions,
+       (SELECT COALESCE(SUM(duration_ms), 0) / 60000 FROM sessions) AS minutes,
+       (SELECT COALESCE(SUM(LENGTH(text) - LENGTH(REPLACE(text, ' ', '')) + 1), 0)
+        FROM segments) AS words,
+       (SELECT COUNT(*) FROM analyses) AS reports`,
+  );
+  return righe[0] ?? { sessions: 0, minutes: 0, words: 0, reports: 0 };
+}
+
 export async function saveAnalysis(
   sessionId: number,
   analysis: Analysis,
