@@ -364,9 +364,22 @@ fn analyze_blocking(
     // Riconosce il tipo di conversazione prima di scrivere: il taglio del
     // documento dipende da quello, e con «Auto» è l'unico modo per sceglierlo.
     let mut kind = "meeting".to_string();
+    // Guarda inizio e fine: le riunioni cominciano con convenevoli che non
+    // dicono nulla sul contenuto, e la natura vera emerge più avanti.
+    let campione = {
+        let caratteri: Vec<char> = transcript.chars().collect();
+        if caratteri.len() <= 6000 {
+            transcript.clone()
+        } else {
+            let testa: String = caratteri[..3000].iter().collect();
+            let coda: String = caratteri[caratteri.len() - 3000..].iter().collect();
+            format!("{testa}\n[…]\n{coda}")
+        }
+    };
+
     if let Ok(risposta) = session.ask(
         SYSTEM_CLASSIFICA,
-        &transcript.chars().take(4000).collect::<String>(),
+        &campione,
         "reading",
         0,
         1,

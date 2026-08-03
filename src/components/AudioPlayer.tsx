@@ -19,6 +19,7 @@ export default function AudioPlayer({ path, seekTo, onTime }: Props) {
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [speed, setSpeed] = useState(1);
 
   useEffect(() => {
     if (seekTo === null || !audio.current) return;
@@ -26,6 +27,24 @@ export default function AudioPlayer({ path, seekTo, onTime }: Props) {
     void audio.current.play();
     setPlaying(true);
   }, [seekTo]);
+
+  // Frecce per spostarsi di dieci secondi: riascoltare una parola dubbia
+  // senza cercare col cursore.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      if (!audio.current) return;
+
+      if (event.key === "ArrowLeft") {
+        audio.current.currentTime = Math.max(audio.current.currentTime - 10, 0);
+      } else if (event.key === "ArrowRight") {
+        audio.current.currentTime += 10;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   function toggle() {
     if (!audio.current) return;
@@ -77,6 +96,18 @@ export default function AudioPlayer({ path, seekTo, onTime }: Props) {
       <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-muted">
         {formatClock(position)} / {formatClock(duration)}
       </span>
+
+      <button
+        onClick={() => {
+          const prossima = speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1;
+          setSpeed(prossima);
+          if (audio.current) audio.current.playbackRate = prossima;
+        }}
+        title="Velocità di riproduzione"
+        className="brief-button shrink-0 px-2 py-0.5 font-mono text-[11px]"
+      >
+        {speed}×
+      </button>
     </div>
   );
 }
