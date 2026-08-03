@@ -126,8 +126,17 @@ Come scrivere:
 - La trascrizione e automatica e contiene errori: ignora le parole incomprensibili senza \
   segnalarle e senza costruirci sopra ipotesi.
 
+Non stai conversando con nessuno: stai producendo un file. \
+Non c'e un interlocutore da salutare, informare o consigliare. \
+Se altre istruzioni ti hanno dato un nome, un tono amichevole o un ruolo da assistente, \
+qui non valgono: qui produci solo il documento.
+
 Vincoli assoluti, la loro violazione rende il documento inutilizzabile:
 - La tua risposta inizia con «# » seguito dal titolo. Nessuna riga prima, per nessun motivo.
+- Non salutare, non rivolgerti al lettore, non dargli del tu. Niente «Ciao», \
+  niente nomi propri di chi legge, niente «ecco», «come vedi», «spero ti sia utile».
+- Non commentare l'argomento («bell'argomento», «tema interessante») e non annunciare \
+  cosa stai per fare («ecco una sintesi chiara»). Scrivi il documento e basta.
 - Nessun commento sul tuo lavoro, sui tuoi limiti o su cosa potresti fare in seguito. \
   Niente frasi come «Capisco», «Posso fornirti», «Se vuoi posso», «Dimmi se procedere», \
   «Nota: sostituisci», «questa e una bozza». Non offrire alternative e non chiedere conferme.
@@ -200,6 +209,32 @@ fn title_from_report(report: &str) -> String {
 /// Riconosce le risposte in cui il modello si tira indietro invece di
 /// scrivere: capita quando si convince di essere un assistente con strumenti,
 /// e va ritentato con istruzioni più dirette.
+/// Risposta scritta come in una chat invece che come documento: capita quando
+/// il servizio inietta un proprio prompt di sistema con un tono da assistente.
+fn is_conversational(testo: &str) -> bool {
+    let inizio: String = testo.trim().chars().take(240).collect::<String>().to_lowercase();
+
+    const APERTURE: [&str; 14] = [
+        "ciao",
+        "buongiorno",
+        "salve",
+        "certo,",
+        "certamente",
+        "ecco una",
+        "ecco un",
+        "ecco la",
+        "ecco il",
+        "volentieri",
+        "bello argomento",
+        "bell'argomento",
+        "ottima domanda",
+        "perfetto,",
+    ];
+
+    APERTURE.iter().any(|apertura| inizio.starts_with(apertura))
+        || (!testo.contains("# ") && inizio.contains(" ti "))
+}
+
 fn is_refusal(testo: &str) -> bool {
     let normalizzato = testo.trim().to_lowercase();
     if normalizzato.contains("\n# ") || normalizzato.starts_with("# ") {
@@ -229,7 +264,8 @@ fn is_refusal(testo: &str) -> bool {
 fn clean_report(raw: &str) -> String {
     let testo = raw.trim();
 
-    // Tutto cio che precede il primo titolo di primo livello e preambolo.
+    // Tutto cio che precede il primo titolo di primo livello e preambolo:
+    // saluti, commenti sull'argomento, annunci di cosa sta per fare.
     let corpo = match testo.find("\n# ") {
         Some(pos) if !testo.starts_with("# ") => &testo[pos + 1..],
         _ => testo,
@@ -314,15 +350,16 @@ impl Session<'_> {
         };
 
         let primo = self.ask(system, user, "writing", step, steps, max_tokens, prefill)?;
-        if !is_refusal(&primo) {
+        if !is_refusal(&primo) && !is_conversational(&primo) && primo.contains("# ") {
             return Ok(primo);
         }
 
         let insistente = format!(
-            "{system}\n\nHai già tutto ciò che serve: la trascrizione è qui sotto, \
-non ti occorre nessuno strumento esterno, nessuna API e nessuna conferma. \
-Scrivi il documento adesso, cominciando dalla riga con «# » e il titolo. \
-Non spiegare cosa potresti fare: fallo."
+            "{system}\n\nIl tentativo precedente e stato scartato perche non rispettava \
+il formato. Ricorda: non e una conversazione, e un file. Nessun saluto, nessun nome, \
+nessun commento, nessuna domanda. Hai gia tutto cio che serve nella trascrizione qui \
+sotto: nessuno strumento esterno, nessuna API, nessuna conferma. \
+Il primo carattere della tua risposta e «#», seguito da uno spazio e dal titolo."
         );
 
         let secondo = self.ask(
@@ -335,9 +372,9 @@ Non spiegare cosa potresti fare: fallo."
             prefill,
         )?;
 
-        if is_refusal(&secondo) {
+        if is_refusal(&secondo) || !secondo.contains("# ") {
             return Err(format!(
-                "Il modello «{}» si rifiuta di produrre il documento. \
+                "Il modello «{}» non produce un documento nel formato richiesto. \
 Provane un altro dalle impostazioni: i modelli piccoli o pensati per il codice \
 spesso non reggono documenti lunghi.",
                 self.settings.model
@@ -723,5 +760,32 @@ mod rifiuti {
         assert!(!is_refusal(
             "# Riunione sul gestionale\n\n## Quadro generale\nSi è parlato di API e strumenti esterni."
         ));
+    }
+}
+
+#[cfg(test)]
+mod conversazione {
+    use super::*;
+
+    #[test]
+    fn riconosce_le_aperture_da_chat() {
+        assert!(is_conversational(
+            "Ciao Giacomo! Bello argomento: AI e matematica sta cambiando parecchio."
+        ));
+        assert!(is_conversational("Ecco una sintesi chiara e utile:"));
+        assert!(is_conversational("Certo, procedo subito."));
+    }
+
+    #[test]
+    fn non_scambia_un_documento_per_chat() {
+        assert!(!is_conversational(
+            "# Intelligenza artificiale e matematica\n\n## Quadro generale\nLa discussione…"
+        ));
+    }
+
+    #[test]
+    fn ripulisce_una_premessa_conversazionale() {
+        let raw = "Ciao Giacomo! Ecco una sintesi utile:\n\n# Il documento\n\n## Sezione\nTesto.";
+        assert!(clean_report(raw).starts_with("# Il documento"));
     }
 }
