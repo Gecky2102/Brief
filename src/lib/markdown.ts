@@ -22,6 +22,37 @@ export function speakerOf(
   return label?.trim() || "Interlocutore";
 }
 
+/// Riepilogo di chi ha parlato e quanto: apre il documento esportato dando
+/// subito il contesto di chi c'era.
+function speakerSummary(segments: Segment[]): string {
+  const durate = new Map<string, number>();
+  for (const segment of segments) {
+    const nome = speakerOf(segment.track, segment.speaker_label);
+    durate.set(
+      nome,
+      (durate.get(nome) ?? 0) + Math.max(segment.end_ms - segment.start_ms, 0),
+    );
+  }
+  if (durate.size < 2) return "";
+
+  const totale = [...durate.values()].reduce((a, b) => a + b, 0);
+  const righe = [...durate.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(
+      ([nome, ms]) =>
+        `| ${nome} | ${Math.round(ms / 60000)} min | ${Math.round((ms / totale) * 100)}% |`,
+    );
+
+  return [
+    "## Interventi",
+    "",
+    "| Voce | Durata | Quota |",
+    "|---|---|---|",
+    ...righe,
+    "",
+  ].join("\n");
+}
+
 export function toMarkdown(
   session: Session,
   segments: Segment[],
@@ -52,7 +83,7 @@ export function toMarkdown(
     )
     .join("\n\n");
 
-  return `${header}${report}## Trascrizione integrale\n\n${transcript}\n`;
+  return `${header}${report}${speakerSummary(segments)}\n## Trascrizione integrale\n\n${transcript}\n`;
 }
 
 export function fileNameFor(session: Session): string {

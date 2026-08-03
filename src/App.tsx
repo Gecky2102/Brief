@@ -7,7 +7,8 @@ import {
   deleteSession,
   listSessions,
   reconcileOrphanSessions,
-  searchSessions,
+  searchWithExcerpts,
+  type SearchHit,
   type Session,
 } from "./lib/db";
 import { deleteRecording } from "./lib/recorder";
@@ -54,6 +55,7 @@ function toMatchQuery(input: string): string {
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [hits, setHits] = useState<Record<number, SearchHit>>({});
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [ready, setReady] = useState(false);
@@ -62,10 +64,22 @@ export default function App() {
 
   const refresh = useCallback(() => {
     const trimmed = query.trim();
-    const load = trimmed
-      ? searchSessions(toMatchQuery(trimmed))
-      : listSessions();
-    load.then(setSessions).catch((cause: unknown) => setError(String(cause)));
+    if (!trimmed) {
+      setHits({});
+      listSessions()
+        .then(setSessions)
+        .catch((cause: unknown) => setError(String(cause)));
+      return;
+    }
+
+    searchWithExcerpts(toMatchQuery(trimmed))
+      .then((risultati) => {
+        setSessions(risultati);
+        setHits(
+          Object.fromEntries(risultati.map((hit) => [hit.id, hit])),
+        );
+      })
+      .catch((cause: unknown) => setError(String(cause)));
   }, [query]);
 
   // Prima di mostrare qualsiasi cosa si chiudono le sessioni rimaste aperte da
@@ -204,7 +218,17 @@ export default function App() {
                   month: "short",
                 })}{" "}
                 · {formatDuration(session.duration_ms)}
+                {hits[session.id] && ` · ${hits[session.id].hits} risultati`}
               </span>
+              {hits[session.id]?.excerpt && (
+                <span
+                  className={`mt-0.5 block truncate text-[11px] ${
+                    session.id === selectedId ? "text-white/70" : "text-ink-muted"
+                  }`}
+                >
+                  {hits[session.id].excerpt}
+                </span>
+              )}
             </button>
               </div>
             );

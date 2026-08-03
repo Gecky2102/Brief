@@ -83,6 +83,27 @@ export async function listSessions(): Promise<Session[]> {
   );
 }
 
+export type SearchHit = Session & { excerpt: string; hits: number };
+
+/// Oltre alle sessioni restituisce un estratto del punto in cui compare il
+/// termine: scorrere un elenco di titoli non dice se il risultato è utile.
+export async function searchWithExcerpts(query: string): Promise<SearchHit[]> {
+  const conn = await db();
+  return conn.select<SearchHit[]>(
+    `SELECT s.id, s.title, s.kind, s.started_at, s.ended_at, s.duration_ms,
+            s.audio_path,
+            snippet(segments_fts, 0, '«', '»', '…', 12) AS excerpt,
+            COUNT(*) AS hits
+     FROM segments_fts f
+     JOIN segments g ON g.id = f.rowid
+     JOIN sessions s ON s.id = g.session_id
+     WHERE segments_fts MATCH $1
+     GROUP BY s.id
+     ORDER BY s.started_at DESC`,
+    [query],
+  );
+}
+
 export async function searchSessions(query: string): Promise<Session[]> {
   const conn = await db();
   return conn.select<Session[]>(
