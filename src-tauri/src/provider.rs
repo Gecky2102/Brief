@@ -108,6 +108,7 @@ pub fn stream(request: Request, mut on_delta: impl FnMut(&str)) -> Result<String
                 .send_json(&body),
             _ => ureq::post(&url)
                 .header("content-type", "application/json")
+                .header("accept", "text/event-stream")
                 .header("authorization", &format!("Bearer {}", request.api_key))
                 .send_json(&body),
         };
@@ -120,6 +121,30 @@ pub fn stream(request: Request, mut on_delta: impl FnMut(&str)) -> Result<String
             Err(errore) => return Err(describe_error(errore, request.provider)),
         }
     };
+
+    let tipo_contenuto = response
+        .headers()
+        .get("content-type")
+        .and_then(|valore| valore.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    // Alcuni gateway ignorano la richiesta di streaming e rispondono con un
+    // JSON unico: va letto in un modo diverso, altrimenti sembra vuoto.
+    if !tipo_contenuto.contains("event-stream") {
+        let testo = response
+            .into_body()
+            .read_to_string()
+            .map_err(|cause| format!("Risposta non leggibile: {cause}"))?;
+
+        let valore: serde_json::Value = serde_json::from_str(&testo)
+            .map_err(|_| "Il servizio ha risposto in un formato inatteso.".to_string())?;
+
+        let completo = extract_complete(&valore, request.provider)
+            .ok_or_else(|| "Il modello non ha restituito nulla.".to_string())?;
+        on_delta(&completo);
+        return Ok(completo);
+    }
 
     let reader = BufReader::new(response.into_body().into_reader());
     let mut full = String::new();
@@ -185,13 +210,44 @@ fn build_body(request: &Request) -> serde_json::Value {
                     "role": "assistant", "content": prefill
                 }));
             }
+            // I gateway compatibili accettano l'uno o l'altro campo a seconda
+            // della versione: mandarli entrambi evita risposte troncate.
             serde_json::json!({
                 "model": request.model,
                 "max_completion_tokens": request.max_tokens,
+                "max_tokens": request.max_tokens,
                 "stream": true,
                 "messages": messages,
             })
         }
+    }
+}
+
+/// Estrae il testo da una risposta non in streaming.
+fn extract_complete(valore: &serde_json::Value, provider: Provider) -> Option<String> {
+    match provider {
+        Provider::Anthropic => valore
+            .get("content")?
+            .get(0)?
+            .get("text")?
+            .as_str()
+            .map(str::to_string),
+        Provider::Google => valore
+            .get("candidates")?
+            .get(0)?
+            .get("content")?
+            .get("parts")?
+            .get(0)?
+            .get("text")?
+            .as_str()
+            .map(str::to_string),
+        _ => valore
+            .get("choices")?
+            .get(0)?
+            .get("message")?
+            .get("content")?
+            .as_str()
+            .map(str::to_string),
     }
 }
 

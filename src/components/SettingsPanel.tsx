@@ -44,7 +44,7 @@ const PROVIDERS: { value: Provider; label: string; hint: string }[] = [
   {
     value: "compatible",
     label: "Compatibile OpenAI",
-    hint: "Qualsiasi servizio con API in stile OpenAI: indica l'indirizzo",
+    hint: "OmniRoute o qualsiasi servizio con API in stile OpenAI: indica l'indirizzo e il modello",
   },
 ];
 
