@@ -54,6 +54,7 @@ pub fn run() {
             export::export_audio,
             export::delete_recording,
             export::audio_file,
+            export::reveal_data_folder,
             import::import_audio,
             settings::get_settings,
             settings::set_settings,

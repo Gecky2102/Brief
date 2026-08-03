@@ -201,6 +201,25 @@ pub fn audio_file(app: AppHandle, directory: String) -> Result<Option<String>, S
     Ok(None)
 }
 
+/// Apre nel Finder la cartella dove Brief tiene database, registrazioni e
+/// modelli: utile per capire cosa occupa spazio o fare una copia.
+#[tauri::command]
+pub fn reveal_data_folder(app: AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|cause| format!("Cartella dati non disponibile: {cause}"))?;
+    std::fs::create_dir_all(&dir).ok();
+
+    Command::new("/usr/bin/open")
+        .arg(&dir)
+        .status()
+        .map_err(|cause| format!("Impossibile aprire la cartella: {cause}"))?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn delete_recording(app: AppHandle, directory: String) -> Result<(), String> {
     let directory = session_directory(&app, &directory)?;

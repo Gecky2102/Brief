@@ -213,6 +213,10 @@ export function audioFile(directory: string): Promise<string | null> {
   return invoke<string | null>("audio_file", { directory });
 }
 
+export function revealDataFolder(): Promise<void> {
+  return invoke<void>("reveal_data_folder");
+}
+
 export function deleteRecording(directory: string): Promise<void> {
   return invoke<void>("delete_recording", { directory });
 }

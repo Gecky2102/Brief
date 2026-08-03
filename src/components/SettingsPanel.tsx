@@ -7,6 +7,7 @@ import {
   hasApiKey,
   setApiKey,
   setSettings,
+  revealDataFolder,
   storageReport,
   testProvider,
   type Provider,
@@ -487,6 +488,13 @@ export default function SettingsPanel({ onClose }: Props) {
             Un modello eliminato viene riscaricato quando serve. I download
             interrotti riprendono da dove erano rimasti.
           </p>
+
+          <button
+            onClick={() => revealDataFolder().catch(() => undefined)}
+            className="brief-button px-3 py-1.5 text-xs"
+          >
+            Apri la cartella dei dati
+          </button>
         </section>
 
         {notice && <p className="text-xs text-ink-muted">{notice}</p>}
