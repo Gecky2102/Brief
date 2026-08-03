@@ -48,6 +48,26 @@ pub const SPEAKER: ModelSpec = ModelSpec {
     bytes: 26_535_549,
 };
 
+/// Ricerca per significato: trasforma il testo in un vettore, così «ritardi
+/// dei fornitori» trova anche chi diceva «non arrivano in tempo».
+pub const EMBEDDING: ModelSpec = ModelSpec {
+    key: "embedding",
+    label: "Modello di ricerca per significato",
+    file_name: "multilingual-e5-small.onnx",
+    url: "https://huggingface.co/Xenova/multilingual-e5-small/resolve/main/onnx/model_quantized.onnx",
+    sha256: "f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193",
+    bytes: 118_308_185,
+};
+
+pub const EMBEDDING_TOKENIZER: ModelSpec = ModelSpec {
+    key: "embedding",
+    label: "Vocabolario della ricerca",
+    file_name: "multilingual-e5-small-tokenizer.json",
+    url: "https://huggingface.co/Xenova/multilingual-e5-small/resolve/main/tokenizer.json",
+    sha256: "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+    bytes: 17_082_730,
+};
+
 #[derive(Clone, Serialize)]
 struct DownloadProgress {
     key: &'static str,
@@ -215,7 +235,13 @@ pub struct ModelStatus {
     pub in_use: bool,
 }
 
-pub const ALL: [&ModelSpec; 3] = [&WHISPER, &WHISPER_ACCURATE, &SPEAKER];
+pub const ALL: [&ModelSpec; 5] = [
+    &WHISPER,
+    &WHISPER_ACCURATE,
+    &SPEAKER,
+    &EMBEDDING,
+    &EMBEDDING_TOKENIZER,
+];
 
 fn size_on_disk(dir: &std::path::Path, spec: &ModelSpec) -> (u64, bool) {
     let complete = dir.join(spec.file_name);

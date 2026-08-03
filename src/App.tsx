@@ -12,13 +12,23 @@ import {
   type SearchHit,
   type Session,
 } from "./lib/db";
-import { deleteRecording, exportMany } from "./lib/recorder";
+import {
+  deleteRecording,
+  embedSegments,
+  exportMany,
+  searchSemantic,
+  semanticReady,
+} from "./lib/recorder";
 import {
   createFolder,
   deleteFolder,
   listFolders,
   listSegments,
   loadAnalysis,
+  loadEmbeddings,
+  saveEmbeddings,
+  segmentsWithoutEmbedding,
+  sessionsForSegments,
   type Folder,
 } from "./lib/db";
 import { fileNameFor, toMarkdown } from "./lib/markdown";
@@ -76,6 +86,9 @@ export default function App() {
   const [activeFolder, setActiveFolder] = useState<number | null | undefined>(
     undefined,
   );
+  const [semantic, setSemantic] = useState(false);
+  const [semanticAvailable, setSemanticAvailable] = useState(false);
+  const [indexing, setIndexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -86,6 +99,31 @@ export default function App() {
         .then(setSessions)
         .catch((cause: unknown) => setError(String(cause)));
       listFolders().then(setFolders).catch(() => undefined);
+      return;
+    }
+
+    if (semantic) {
+      loadEmbeddings()
+        .then(async (candidati) => {
+          if (candidati.length === 0) {
+            setSessions([]);
+            return;
+          }
+          const risultati = await searchSemantic(trimmed, candidati, 30);
+          const sessioni = await sessionsForSegments(
+            risultati.map((hit) => hit.segment_id),
+          );
+          setSessions(sessioni);
+          setHits(
+            Object.fromEntries(
+              sessioni.map((s) => [
+                s.id,
+                { ...s, excerpt: s.excerpt ?? "", hits: 1 },
+              ]),
+            ),
+          );
+        })
+        .catch((cause: unknown) => setError(String(cause)));
       return;
     }
 
@@ -101,6 +139,32 @@ export default function App() {
 
   // Prima di mostrare qualsiasi cosa si chiudono le sessioni rimaste aperte da
   // un'uscita brusca, altrimenti restano in lista come "Registrazione in corso".
+  useEffect(() => {
+    semanticReady().then(setSemanticAvailable).catch(() => undefined);
+  }, []);
+
+  /// Indicizza a piccoli blocchi le righe non ancora coperte: farlo tutto in
+  /// una volta bloccherebbe l'interfaccia su archivi grandi.
+  const indicizza = useCallback(async () => {
+    setIndexing(true);
+    try {
+      for (;;) {
+        const mancanti = await segmentsWithoutEmbedding();
+        if (mancanti.length === 0) break;
+        const vettori = await embedSegments(mancanti.map((riga) => riga.text));
+        await saveEmbeddings(
+          mancanti.map((riga, indice) => [riga.id, vettori[indice]]),
+        );
+        if (mancanti.length < 400) break;
+      }
+      setSemanticAvailable(true);
+    } catch (cause: unknown) {
+      setError(String(cause));
+    } finally {
+      setIndexing(false);
+    }
+  }, []);
+
   useEffect(() => {
     reconcileOrphanSessions()
       .catch(() => undefined)
@@ -219,9 +283,40 @@ export default function App() {
             ref={searchInput}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Cerca nelle trascrizioni"
+            placeholder={
+              semantic ? "Cerca per significato" : "Cerca nelle trascrizioni"
+            }
             className="brief-field w-full px-2.5 py-1.5 text-xs"
           />
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSemantic((attivo) => !attivo)}
+              disabled={!semanticAvailable}
+              title={
+                semanticAvailable
+                  ? "Trova anche chi ha detto la stessa cosa con parole diverse"
+                  : "Serve indicizzare l'archivio"
+              }
+              className={`rounded-full px-2 py-0.5 text-[11px] transition-colors ${
+                semantic
+                  ? "bg-accent text-white"
+                  : "border border-edge hover:bg-surface-raised"
+              } disabled:opacity-40`}
+            >
+              Per significato
+            </button>
+
+            {!semanticAvailable && (
+              <button
+                onClick={indicizza}
+                disabled={indexing}
+                className="text-[11px] text-ink-muted underline underline-offset-2 disabled:opacity-40"
+              >
+                {indexing ? "Indicizzo…" : "Attiva"}
+              </button>
+            )}
+          </div>
         </header>
 
         {folders.length > 0 && (

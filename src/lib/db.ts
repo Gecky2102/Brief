@@ -345,6 +345,57 @@ export async function setSessionTitle(
 }
 
 /// Statistiche complessive dell'archivio, per la schermata iniziale.
+export async function saveEmbeddings(
+  entries: [number, number[]][],
+): Promise<void> {
+  const conn = await db();
+  for (const [segmentId, vector] of entries) {
+    await conn.execute(
+      "INSERT OR REPLACE INTO embeddings (segment_id, vector) VALUES ($1, $2)",
+      [segmentId, JSON.stringify(vector)],
+    );
+  }
+}
+
+/// Righe non ancora indicizzate: l'indicizzazione è incrementale, così una
+/// nuova sessione non costringe a rifare tutto l'archivio.
+export async function segmentsWithoutEmbedding(): Promise<
+  { id: number; text: string }[]
+> {
+  const conn = await db();
+  return conn.select<{ id: number; text: string }[]>(
+    `SELECT g.id, g.text FROM segments g
+     LEFT JOIN embeddings e ON e.segment_id = g.id
+     WHERE e.segment_id IS NULL AND LENGTH(g.text) > 15
+     LIMIT 400`,
+  );
+}
+
+export async function loadEmbeddings(): Promise<[number, number[]][]> {
+  const conn = await db();
+  const righe = await conn.select<{ segment_id: number; vector: string }[]>(
+    "SELECT segment_id, vector FROM embeddings",
+  );
+  return righe.map((riga) => [riga.segment_id, JSON.parse(riga.vector)]);
+}
+
+export async function sessionsForSegments(
+  ids: number[],
+): Promise<(Session & { excerpt: string })[]> {
+  if (ids.length === 0) return [];
+  const conn = await db();
+  const elenco = ids.join(",");
+  return conn.select<(Session & { excerpt: string })[]>(
+    `SELECT s.id, s.title, s.kind, s.started_at, s.ended_at, s.duration_ms,
+            s.audio_path, s.folder_id,
+            (SELECT text FROM segments WHERE id IN (${elenco})
+              AND session_id = s.id LIMIT 1) AS excerpt
+     FROM sessions s
+     WHERE s.id IN (SELECT session_id FROM segments WHERE id IN (${elenco}))
+     ORDER BY s.started_at DESC`,
+  );
+}
+
 export async function archiveStats(): Promise<{
   sessions: number;
   minutes: number;

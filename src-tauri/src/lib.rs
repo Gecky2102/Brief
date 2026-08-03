@@ -5,6 +5,7 @@ mod export;
 mod import;
 mod models;
 mod provider;
+mod semantic;
 mod settings;
 mod transcriber;
 
@@ -34,6 +35,12 @@ fn migrations() -> Vec<Migration> {
             version: 4,
             description: "add folders to organise sessions",
             sql: include_str!("../migrations/004_folders.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 5,
+            description: "store semantic embeddings for segments",
+            sql: include_str!("../migrations/005_embeddings.sql"),
             kind: MigrationKind::Up,
         },
     ]
@@ -77,7 +84,10 @@ pub fn run() {
             settings::test_provider,
             models::storage_report,
             models::delete_model,
-            models::verify_model
+            models::verify_model,
+            semantic::embed_segments,
+            semantic::search_semantic,
+            semantic::semantic_ready
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

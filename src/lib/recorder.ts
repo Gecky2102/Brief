@@ -139,6 +139,28 @@ export function testProvider(): Promise<string> {
   return invoke<string>("test_provider");
 }
 
+export type SemanticHit = { segment_id: number; score: number };
+
+export function embedSegments(texts: string[]): Promise<number[][]> {
+  return invoke<number[][]>("embed_segments", { texts });
+}
+
+export function searchSemantic(
+  query: string,
+  candidates: [number, number[]][],
+  limit: number,
+): Promise<SemanticHit[]> {
+  return invoke<SemanticHit[]>("search_semantic", {
+    query,
+    candidates,
+    limit,
+  });
+}
+
+export function semanticReady(): Promise<boolean> {
+  return invoke<boolean>("semantic_ready");
+}
+
 export function storageReport(): Promise<StorageReport> {
   return invoke<StorageReport>("storage_report");
 }
