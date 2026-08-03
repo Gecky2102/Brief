@@ -30,21 +30,6 @@ pub fn run() {
         .setup(|app| {
             audio::remember_app_handle(app.handle().clone());
 
-            // Materiale traslucido di sistema: è ciò che distingue a colpo
-            // d'occhio una finestra macOS da una pagina web dentro una cornice.
-            #[cfg(target_os = "macos")]
-            {
-                use tauri::Manager;
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window_vibrancy::apply_vibrancy(
-                        &window,
-                        window_vibrancy::NSVisualEffectMaterial::Sidebar,
-                        Some(window_vibrancy::NSVisualEffectState::Active),
-                        None,
-                    );
-                }
-            }
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

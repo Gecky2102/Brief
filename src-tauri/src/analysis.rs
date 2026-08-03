@@ -209,7 +209,7 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
 
     let session = Session {
         settings: settings::load(&app),
-        api_key: settings::api_key(),
+        api_key: settings::api_key(&app),
         app: &app,
     };
 
@@ -299,7 +299,7 @@ pub struct ModelsStatus {
 pub fn models_status(app: AppHandle) -> ModelsStatus {
     ModelsStatus {
         transcription: crate::transcriber::is_model_ready(&app),
-        analysis: !settings::api_key().is_empty(),
+        analysis: !settings::api_key(&app).is_empty(),
     }
 }
 

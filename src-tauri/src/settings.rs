@@ -6,9 +6,6 @@ use tauri::{AppHandle, Manager};
 use crate::models::{self, ModelSpec};
 use crate::provider::Provider;
 
-const KEYCHAIN_SERVICE: &str = "it.gmasiero.brief";
-const KEYCHAIN_ACCOUNT: &str = "provider-api-key";
-
 /// «Veloce» tiene il modello di trascrizione piccolo: parte subito e consuma
 /// poco. «Accurata» ne scarica uno grande: regge molto meglio parlato
 /// spontaneo, dialetti e più voci sovrapposte.
@@ -70,20 +67,23 @@ pub fn whisper_model(app: &AppHandle) -> &'static ModelSpec {
     whisper_model_for(load(app).quality)
 }
 
-/// La chiave sta nel portachiavi di sistema, non in `settings.json`: un file di
-/// configurazione finisce nei backup e si legge in chiaro.
-fn keyring_entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
-        .map_err(|cause| format!("Portachiavi non accessibile: {cause}"))
+/// La chiave sta in un file separato dalle impostazioni, leggibile solo
+/// dall'utente. Il portachiavi sarebbe più solido, ma con una firma ad-hoc —
+/// che cambia a ogni build — macOS chiederebbe l'autorizzazione ogni volta.
+fn key_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|cause| format!("Cartella dati non disponibile: {cause}"))?;
+    std::fs::create_dir_all(&dir).map_err(|cause| format!("Cartella dati non creata: {cause}"))?;
+    Ok(dir.join("provider.key"))
 }
 
-pub fn api_key() -> String {
-    keyring_entry()
-        .and_then(|entry| {
-            entry
-                .get_password()
-                .map_err(|cause| format!("Chiave non leggibile: {cause}"))
-        })
+pub fn api_key(app: &AppHandle) -> String {
+    key_path(app)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|raw| raw.trim().to_string())
         .unwrap_or_default()
 }
 
@@ -102,18 +102,29 @@ pub fn set_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
 
 /// Riporta solo se una chiave esiste: il valore non torna mai all'interfaccia.
 #[tauri::command]
-pub fn has_api_key() -> bool {
-    !api_key().is_empty()
+pub fn has_api_key(app: AppHandle) -> bool {
+    !api_key(&app).is_empty()
 }
 
 #[tauri::command]
-pub fn set_api_key(key: String) -> Result<(), String> {
-    let entry = keyring_entry()?;
+pub fn set_api_key(app: AppHandle, key: String) -> Result<(), String> {
+    let path = key_path(&app)?;
+
     if key.trim().is_empty() {
-        let _ = entry.delete_credential();
+        let _ = std::fs::remove_file(&path);
         return Ok(());
     }
-    entry
-        .set_password(key.trim())
-        .map_err(|cause| format!("Chiave non salvata: {cause}"))
+
+    std::fs::write(&path, key.trim())
+        .map_err(|cause| format!("Chiave non salvata: {cause}"))?;
+
+    // Solo il proprietario può leggerla: senza questo il file nascerebbe
+    // leggibile da chiunque abbia accesso al Mac.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(())
 }

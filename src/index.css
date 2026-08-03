@@ -1,31 +1,52 @@
 @import "tailwindcss";
 
+/* I nomi delle utility si registrano qui; i valori veri stanno in :root, così
+   il tema scuro può ridefinirli — dentro @theme non sarebbe possibile. */
 @theme {
-  /* Blu di sistema macOS, in chiaro e in scuro. */
-  --color-accent: #0a84ff;
-  --color-accent-soft: rgba(10, 132, 255, 0.16);
-  --color-live: #ff453a;
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-live: var(--live);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-edge: var(--edge);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+}
 
-  --color-surface: rgba(255, 255, 255, 0.72);
-  --color-surface-raised: rgba(0, 0, 0, 0.045);
-  --color-surface-sunken: rgba(0, 0, 0, 0.03);
-  --color-edge: rgba(0, 0, 0, 0.11);
-  --color-ink: #1d1d1f;
-  --color-ink-muted: rgba(0, 0, 0, 0.5);
+:root {
+  --accent: #0a6cff;
+  --accent-soft: rgba(10, 108, 255, 0.12);
+  --live: #e0352b;
 
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
-    sans-serif;
+  --surface: #f2f2f4;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e6e6e9;
+  --edge: rgba(0, 0, 0, 0.13);
+  --ink: #1d1d1f;
+  --ink-muted: rgba(0, 0, 0, 0.52);
+
+  --content: #ffffff;
+
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  @theme {
-    --color-surface: rgba(30, 30, 32, 0.6);
-    --color-surface-raised: rgba(255, 255, 255, 0.07);
-    --color-surface-sunken: rgba(0, 0, 0, 0.22);
-    --color-edge: rgba(255, 255, 255, 0.12);
-    --color-ink: #f5f5f7;
-    --color-ink-muted: rgba(255, 255, 255, 0.55);
+  :root {
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.18);
+    --live: #ff453a;
+
+    --surface: #1c1c1e;
+    --surface-raised: #2c2c2e;
+    --surface-sunken: #141416;
+    --edge: rgba(255, 255, 255, 0.13);
+    --ink: #f5f5f7;
+    --ink-muted: rgba(255, 255, 255, 0.56);
+
+    --content: #232325;
+
+    color-scheme: dark;
   }
 }
 
@@ -35,29 +56,22 @@ body,
   height: 100%;
 }
 
-/* La finestra è trasparente: lo sfondo lo mette il materiale di sistema
-   applicato lato Rust, così la barra laterale prende il colore di ciò che
-   sta dietro, come nelle app native. */
 body {
-  background: transparent;
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+  background-color: var(--surface);
+  color: var(--ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    sans-serif;
   font-size: 13px;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 
-/* Il contenuto principale resta opaco: testo lungo sopra un fondo
-   traslucido è faticoso da leggere. */
+/* Il contenuto è leggermente più chiaro della barra laterale, come nelle app
+   di sistema. */
 .brief-content {
-  background-color: rgba(255, 255, 255, 0.82);
-}
-
-@media (prefers-color-scheme: dark) {
-  .brief-content {
-    background-color: rgba(22, 22, 24, 0.82);
-  }
+  background-color: var(--content);
 }
 
 /* Trascina la finestra dai margini vuoti in alto, come in ogni app macOS. */
@@ -66,7 +80,9 @@ body {
 }
 .brief-drag button,
 .brief-drag input,
-.brief-drag select {
+.brief-drag select,
+.brief-drag textarea,
+.brief-drag a {
   -webkit-app-region: no-drag;
 }
 
@@ -75,28 +91,28 @@ body {
   height: 11px;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.22);
+  background-color: rgba(0, 0, 0, 0.24);
   border: 3px solid transparent;
   background-clip: content-box;
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(0, 0, 0, 0.35);
+  background-color: rgba(0, 0, 0, 0.38);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 @media (prefers-color-scheme: dark) {
   ::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.22);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.32);
+    background-color: rgba(255, 255, 255, 0.34);
   }
 }
 
 ::selection {
-  background-color: var(--color-accent-soft);
+  background-color: var(--accent-soft);
 }
 
 input,
@@ -104,11 +120,12 @@ select,
 textarea,
 button {
   font: inherit;
+  color: inherit;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--color-ink-muted);
+  color: var(--ink-muted);
 }
 
 @keyframes brief-pulse {
@@ -148,48 +165,46 @@ textarea::placeholder {
   animation: brief-rise 0.2s ease-out both;
 }
 
-/* Placeholder mostrato mentre un segmento è in coda di trascrizione. */
 .brief-skeleton {
   background-image: linear-gradient(
     90deg,
-    var(--color-surface-raised) 0%,
-    var(--color-edge) 40%,
-    var(--color-surface-raised) 80%
+    var(--surface-sunken) 0%,
+    var(--edge) 40%,
+    var(--surface-sunken) 80%
   );
   background-size: 200% 100%;
   animation: brief-shimmer 1.6s linear infinite;
 }
 
-/* Pulsante principale in stile macOS: pieno, angoli morbidi, pressione
-   percepibile. */
 .brief-button-primary {
-  background-color: var(--color-accent);
-  color: white;
-  border-radius: 8px;
+  background-color: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
   font-weight: 500;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   transition:
     filter 0.12s ease,
     transform 0.08s ease;
 }
 .brief-button-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.1);
 }
 .brief-button-primary:active:not(:disabled) {
   transform: scale(0.975);
-  filter: brightness(0.94);
+  filter: brightness(0.92);
 }
 
 .brief-button {
   border-radius: 7px;
-  border: 1px solid var(--color-edge);
-  background-color: var(--color-surface-raised);
+  border: 1px solid var(--edge);
+  background-color: var(--surface-raised);
+  color: var(--ink);
   transition:
     background-color 0.12s ease,
     transform 0.08s ease;
 }
 .brief-button:hover:not(:disabled) {
-  background-color: var(--color-edge);
+  background-color: var(--surface-sunken);
 }
 .brief-button:active:not(:disabled) {
   transform: scale(0.975);
@@ -197,17 +212,15 @@ textarea::placeholder {
 
 .brief-field {
   border-radius: 7px;
-  border: 1px solid var(--color-edge);
-  background-color: rgba(255, 255, 255, 0.6);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  border: 1px solid var(--edge);
+  background-color: var(--surface-raised);
+  color: var(--ink);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 .brief-field:focus {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft);
-}
-@media (prefers-color-scheme: dark) {
-  .brief-field {
-    background-color: rgba(0, 0, 0, 0.25);
-  }
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }

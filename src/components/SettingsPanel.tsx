@@ -256,8 +256,8 @@ export default function SettingsPanel({ onClose }: Props) {
               </button>
             </div>
             <span className="block text-[11px] leading-snug text-ink-muted">
-              Custodita nel portachiavi di macOS, non in un file di
-              configurazione.
+              Salvata in un file leggibile solo dal tuo utente, dentro la
+              cartella dati di Brief.
             </span>
           </label>
         </section>
