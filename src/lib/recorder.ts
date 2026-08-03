@@ -16,6 +16,7 @@ export type SegmentEvent = {
   start_ms: number;
   end_ms: number;
   text: string;
+  speaker: number | null;
 };
 
 export type DownloadProgress = {

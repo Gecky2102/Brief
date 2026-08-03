@@ -30,6 +30,9 @@ struct SegmentEvent {
     start_ms: i64,
     end_ms: i64,
     text: String,
+    /// Gruppo vocale assegnato dall'impronta, oppure `None` se la porzione era
+    /// troppo breve o il modello delle voci non è disponibile.
+    speaker: Option<usize>,
 }
 
 struct Running {
@@ -39,6 +42,56 @@ struct Running {
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 static CONTEXT: Mutex<Option<Arc<WhisperContext>>> = Mutex::new(None);
+/// Impronte raccolte durante la sessione: servono a riconoscere una voce già
+/// sentita e ad assegnarle lo stesso gruppo.
+static VOICES: Mutex<Vec<Vec<f32>>> = Mutex::new(Vec::new());
+
+/// Sopra questa somiglianza due porzioni sono considerate della stessa persona.
+/// Tarata verso l'alto: separare per sbaglio due interventi della stessa voce
+/// si corregge con un clic, mentre fondere due persone diverse è più fastidioso.
+const SAME_VOICE: f32 = 0.62;
+const MAX_VOICES: usize = 8;
+
+/// Assegna la porzione a una voce già sentita, o ne apre una nuova.
+fn assign_voice(model: &Option<crate::diarization::SharedModel>, audio: &[f32]) -> Option<usize> {
+    let model = model.as_ref()?;
+    let durata = audio.len() as f32 / SAMPLE_RATE as f32;
+    if durata < crate::diarization::MIN_SPEECH_SECONDS {
+        return None;
+    }
+
+    let impronta = model.embed(audio).ok()?;
+    let mut voci = VOICES.lock().ok()?;
+
+    let mut migliore: Option<(usize, f32)> = None;
+    for (indice, nota) in voci.iter().enumerate() {
+        let punteggio = crate::diarization::similarity(&impronta, nota);
+        if migliore.map_or(true, |(_, best)| punteggio > best) {
+            migliore = Some((indice, punteggio));
+        }
+    }
+
+    match migliore {
+        Some((indice, punteggio)) if punteggio >= SAME_VOICE => {
+            // Sposta il riferimento verso la media, così regge i cambi di tono.
+            let nota = &mut voci[indice];
+            for (valore, nuovo) in nota.iter_mut().zip(impronta.iter()) {
+                *valore = (*valore * 0.8) + (nuovo * 0.2);
+            }
+            let norma = nota.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
+            for valore in nota.iter_mut() {
+                *valore /= norma;
+            }
+            Some(indice)
+        }
+        _ if voci.len() < MAX_VOICES => {
+            voci.push(impronta);
+            Some(voci.len() - 1)
+        }
+        Some((indice, _)) => Some(indice),
+        None => None,
+    }
+}
 
 /// Chiamata da Swift dalla coda audio: copia i campioni e torna subito, il
 /// lavoro pesante è nei worker.
@@ -148,6 +201,7 @@ fn worker(
     session_id: i64,
     track: &'static str,
     context: Arc<WhisperContext>,
+    speaker: Option<crate::diarization::SharedModel>,
     receiver: Receiver<Chunk>,
 ) {
     let mut buffer: Vec<f32> = Vec::new();
@@ -168,6 +222,13 @@ fn worker(
 
         match transcribe(&context, &audio) {
             Ok(text) if !is_noise(&text) => {
+                // Il microfono è sempre chi usa Brief: non serve riconoscerlo.
+                let voice = if track == "mic" {
+                    None
+                } else {
+                    assign_voice(&speaker, &audio)
+                };
+
                 let _ = app.emit(
                     "transcript://segment",
                     SegmentEvent {
@@ -176,6 +237,7 @@ fn worker(
                         start_ms: buffer_start_ms,
                         end_ms,
                         text,
+                        speaker: voice,
                     },
                 );
             }
@@ -234,6 +296,12 @@ pub fn transcribe_samples(
     let context = WhisperContext::new_with_params(model, WhisperContextParameters::default())
         .map_err(|cause| format!("Modello di trascrizione non caricato: {cause}"))?;
 
+    VOICES.lock().unwrap().clear();
+    let speaker = models::ensure(app, &models::SPEAKER)
+        .ok()
+        .and_then(|percorso| crate::diarization::SpeakerModel::load(&percorso).ok())
+        .map(Arc::new);
+
     let window = (SAMPLE_RATE * MAX_SEGMENT_MS / 1000) as usize;
     let mut offset = 0_usize;
 
@@ -254,6 +322,7 @@ pub fn transcribe_samples(
                             start_ms,
                             end_ms,
                             text,
+                            speaker: assign_voice(&speaker, chunk),
                         },
                     );
                 }
@@ -284,6 +353,14 @@ pub fn is_model_ready(app: &AppHandle) -> bool {
 pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
     let path = models::ensure(app, crate::settings::whisper_model(app))?;
 
+    // Il riconoscimento delle voci è un di più: se il modello manca o non si
+    // carica, la trascrizione va avanti lo stesso.
+    VOICES.lock().unwrap().clear();
+    let speaker = models::ensure(app, &models::SPEAKER)
+        .ok()
+        .and_then(|percorso| crate::diarization::SpeakerModel::load(&percorso).ok())
+        .map(Arc::new);
+
     let context = Arc::new(
         WhisperContext::new_with_params(&path, WhisperContextParameters::default())
         .map_err(|cause| format!("Modello di trascrizione non caricato: {cause}"))?,
@@ -297,8 +374,9 @@ pub fn start(app: &AppHandle, session_id: i64) -> Result<(), String> {
         let app = app.clone();
         let context = context.clone();
         senders.push(sender);
+        let speaker = speaker.clone();
         workers.push(std::thread::spawn(move || {
-            worker(app, session_id, track, context, receiver)
+            worker(app, session_id, track, context, speaker, receiver)
         }));
     }
 

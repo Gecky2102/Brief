@@ -37,6 +37,17 @@ pub const WHISPER_ACCURATE: ModelSpec = ModelSpec {
     bytes: 574_041_195,
 };
 
+/// Impronta vocale: serve a capire chi parla, raggruppando le porzioni di
+/// parlato che hanno la stessa voce.
+pub const SPEAKER: ModelSpec = ModelSpec {
+    key: "speaker",
+    label: "Modello di riconoscimento voci",
+    file_name: "wespeaker-resnet34.onnx",
+    url: "https://huggingface.co/onnx-community/wespeaker-voxceleb-resnet34-LM/resolve/main/onnx/model.onnx",
+    sha256: "3955447b0499dc9e0a4541a895df08b03c69098eba4e56c02b5603e9f7f4fcbb",
+    bytes: 26_535_549,
+};
+
 #[derive(Clone, Serialize)]
 struct DownloadProgress {
     key: &'static str,
@@ -204,7 +215,7 @@ pub struct ModelStatus {
     pub in_use: bool,
 }
 
-pub const ALL: [&ModelSpec; 2] = [&WHISPER, &WHISPER_ACCURATE];
+pub const ALL: [&ModelSpec; 3] = [&WHISPER, &WHISPER_ACCURATE, &SPEAKER];
 
 fn size_on_disk(dir: &std::path::Path, spec: &ModelSpec) -> (u64, bool) {
     let complete = dir.join(spec.file_name);
@@ -229,7 +240,7 @@ pub struct StorageReport {
 pub fn storage_report(app: AppHandle) -> Result<StorageReport, String> {
     let dir = models_dir(&app)?;
     let quality = crate::settings::load(&app).quality;
-    let in_uso = [crate::settings::whisper_model_for(quality).file_name];
+    let in_uso = [crate::settings::whisper_model_for(quality).file_name, SPEAKER.file_name];
 
     let mut models = Vec::new();
     let mut used_bytes = 0;

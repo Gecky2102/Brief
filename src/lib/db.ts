@@ -33,6 +33,14 @@ export type Segment = {
   start_ms: number;
   end_ms: number;
   text: string;
+  speaker_id: number | null;
+  speaker_label: string | null;
+};
+
+export type Speaker = {
+  id: number;
+  cluster_index: number;
+  label: string;
 };
 
 export type Analysis = {
@@ -121,26 +129,97 @@ export async function deleteSession(id: number): Promise<void> {
   await conn.execute("DELETE FROM sessions WHERE id = $1", [id]);
 }
 
+/// Restituisce la voce corrispondente al gruppo, creandola al primo incontro
+/// con un nome provvisorio numerato.
+async function ensureSpeaker(
+  sessionId: number,
+  clusterIndex: number,
+): Promise<number> {
+  const conn = await db();
+  const esistenti = await conn.select<{ id: number }[]>(
+    "SELECT id FROM speakers WHERE session_id = $1 AND cluster_index = $2",
+    [sessionId, clusterIndex],
+  );
+  if (esistenti.length > 0) return esistenti[0].id;
+
+  const result = await conn.execute(
+    "INSERT INTO speakers (session_id, cluster_index, label) VALUES ($1, $2, $3)",
+    [sessionId, clusterIndex, `Voce ${clusterIndex + 1}`],
+  );
+  return Number(result.lastInsertId ?? 0);
+}
+
 export async function addSegment(input: {
   sessionId: number;
   track: "mic" | "system";
   startMs: number;
   endMs: number;
   text: string;
+  speaker: number | null;
 }): Promise<void> {
   const conn = await db();
+  const speakerId =
+    input.speaker === null
+      ? null
+      : await ensureSpeaker(input.sessionId, input.speaker);
+
   await conn.execute(
-    `INSERT INTO segments (session_id, track, start_ms, end_ms, text)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [input.sessionId, input.track, input.startMs, input.endMs, input.text],
+    `INSERT INTO segments (session_id, track, start_ms, end_ms, text, speaker_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      input.sessionId,
+      input.track,
+      input.startMs,
+      input.endMs,
+      input.text,
+      speakerId,
+    ],
   );
+}
+
+export async function listSpeakers(sessionId: number): Promise<Speaker[]> {
+  const conn = await db();
+  return conn.select<Speaker[]>(
+    "SELECT id, cluster_index, label FROM speakers WHERE session_id = $1 ORDER BY cluster_index",
+    [sessionId],
+  );
+}
+
+export async function renameSpeaker(id: number, label: string): Promise<void> {
+  const conn = await db();
+  await conn.execute("UPDATE speakers SET label = $1 WHERE id = $2", [label, id]);
+}
+
+/// Sposta tutti i segmenti di una voce su un'altra ed elimina quella svuotata:
+/// serve quando il riconoscimento ha diviso in due la stessa persona.
+export async function mergeSpeakers(from: number, into: number): Promise<void> {
+  const conn = await db();
+  await conn.execute("UPDATE segments SET speaker_id = $1 WHERE speaker_id = $2", [
+    into,
+    from,
+  ]);
+  await conn.execute("DELETE FROM speakers WHERE id = $1", [from]);
+}
+
+export async function assignSegment(
+  segmentId: number,
+  speakerId: number | null,
+): Promise<void> {
+  const conn = await db();
+  await conn.execute("UPDATE segments SET speaker_id = $1 WHERE id = $2", [
+    speakerId,
+    segmentId,
+  ]);
 }
 
 export async function listSegments(sessionId: number): Promise<Segment[]> {
   const conn = await db();
   return conn.select<Segment[]>(
-    `SELECT id, track, start_ms, end_ms, text FROM segments
-     WHERE session_id = $1 ORDER BY start_ms`,
+    `SELECT g.id, g.track, g.start_ms, g.end_ms, g.text, g.speaker_id,
+            p.label AS speaker_label
+     FROM segments g
+     LEFT JOIN speakers p ON p.id = g.speaker_id
+     WHERE g.session_id = $1 ORDER BY g.start_ms`,
     [sessionId],
   );
 }

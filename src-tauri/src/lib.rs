@@ -1,4 +1,5 @@
 mod analysis;
+mod diarization;
 mod audio;
 mod export;
 mod import;
@@ -10,12 +11,20 @@ mod transcriber;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "create sessions, segments and full-text index",
-        sql: include_str!("../migrations/001_initial.sql"),
-        kind: MigrationKind::Up,
-    }]
+    vec![
+        Migration {
+            version: 1,
+            description: "create sessions, segments and full-text index",
+            sql: include_str!("../migrations/001_initial.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add speakers and link segments to them",
+            sql: include_str!("../migrations/002_speakers.sql"),
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -14,8 +14,12 @@ function formatStamp(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function speakerOf(track: "mic" | "system"): string {
-  return track === "mic" ? "Io" : "Interlocutore";
+export function speakerOf(
+  track: "mic" | "system",
+  label?: string | null,
+): string {
+  if (track === "mic") return "Io";
+  return label?.trim() || "Interlocutore";
 }
 
 export function toMarkdown(
@@ -44,7 +48,7 @@ export function toMarkdown(
   const transcript = segments
     .map(
       (segment) =>
-        `**${speakerOf(segment.track)}** \`${formatStamp(segment.start_ms)}\` — ${segment.text}`,
+        `**${speakerOf(segment.track, segment.speaker_label)}** \`${formatStamp(segment.start_ms)}\` — ${segment.text}`,
     )
     .join("\n\n");
 

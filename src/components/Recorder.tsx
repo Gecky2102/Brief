@@ -88,6 +88,7 @@ export default function Recorder({ onFinished }: Props) {
           startMs: event.start_ms,
           endMs: event.end_ms,
           text: event.text,
+          speaker: event.speaker,
         }).catch(() => undefined);
       }),
       onTranscriptError(setError),
@@ -407,6 +408,7 @@ export default function Recorder({ onFinished }: Props) {
                 }`}
               >
                 {speakerOf(line.track)}
+                {line.speaker !== null && line.track !== "mic" && ` ${line.speaker + 1}`}
               </span>
               {line.text}
             </p>

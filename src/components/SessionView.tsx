@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Spinner from "./Spinner";
 import ReportView from "./ReportView";
+import SpeakerBar, { speakerColor } from "./SpeakerBar";
 import {
   KIND_LABELS,
   listSegments,
+  listSpeakers,
   loadAnalysis,
+  mergeSpeakers,
+  renameSpeaker,
   saveAnalysis,
   setSessionKind,
   setSessionTitle,
@@ -12,6 +16,7 @@ import {
   type Analysis,
   type Segment,
   type Session,
+  type Speaker,
   type SessionKind,
 } from "../lib/db";
 import { fileNameFor, speakerOf, toMarkdown } from "../lib/markdown";
@@ -40,6 +45,7 @@ function formatStamp(ms: number): string {
 
 export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [download, setDownload] = useState<DownloadProgress | null>(null);
@@ -58,6 +64,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     setNotice(null);
     setConfirmingDelete(false);
     listSegments(session.id).then(setSegments).catch(() => undefined);
+    listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
     loadAnalysis(session.id).then(setAnalysis).catch(() => undefined);
   }, [session.id, session.title]);
 
@@ -80,8 +87,10 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     setProgress(null);
     setError(null);
     try {
+      // I nomi dati alle voci entrano nel report: senza, il modello non può
+      // attribuire a nessuno ciò che viene detto.
       const lines = segments.map((segment) => ({
-        speaker: speakerOf(segment.track),
+        speaker: speakerOf(segment.track, segment.speaker_label),
         text: segment.text,
       }));
       const result = await analyzeSession(lines);
@@ -117,6 +126,21 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
         item.id === segment.id ? { ...item, text: trimmed } : item,
       ),
     );
+  }
+
+  const ricaricaVoci = useCallback(() => {
+    listSegments(session.id).then(setSegments).catch(() => undefined);
+    listSpeakers(session.id).then(setSpeakers).catch(() => undefined);
+  }, [session.id]);
+
+  async function rinomina(id: number, label: string) {
+    await renameSpeaker(id, label);
+    ricaricaVoci();
+  }
+
+  async function unisci(from: number, into: number) {
+    await mergeSpeakers(from, into);
+    ricaricaVoci();
   }
 
   async function changeKind(kind: SessionKind) {
@@ -341,7 +365,18 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
 
 
         {tab === "transcript" && (
-        <section className="space-y-3">
+        <section className="space-y-4">
+          <SpeakerBar
+            speakers={speakers}
+            counts={segments.reduce<Record<number, number>>((acc, segment) => {
+              if (segment.speaker_id !== null) {
+                acc[segment.speaker_id] = (acc[segment.speaker_id] ?? 0) + 1;
+              }
+              return acc;
+            }, {})}
+            onRename={rinomina}
+            onMerge={unisci}
+          />
           {segments.length === 0 ? (
             <p className="text-sm text-ink-muted">
               Nessun parlato riconosciuto in questa sessione.
@@ -356,11 +391,22 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                   {formatStamp(segment.start_ms)}
                 </span>
                 <span
-                  className={`w-24 shrink-0 pt-0.5 text-xs font-medium ${
-                    segment.track === "mic" ? "text-accent" : "text-ink-muted"
-                  }`}
+                  className="flex w-28 shrink-0 items-center gap-1.5 pt-0.5 text-xs font-medium"
+                  style={{
+                    color:
+                      segment.track === "mic"
+                        ? "var(--accent)"
+                        : segment.speaker_id !== null
+                          ? speakerColor(
+                              speakers.find((v) => v.id === segment.speaker_id)
+                                ?.cluster_index ?? 0,
+                            )
+                          : "var(--ink-muted)",
+                  }}
                 >
-                  {speakerOf(segment.track)}
+                  <span className="truncate">
+                    {speakerOf(segment.track, segment.speaker_label)}
+                  </span>
                 </span>
                 {editingId === segment.id ? (
                   <textarea
