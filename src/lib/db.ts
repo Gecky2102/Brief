@@ -39,9 +39,8 @@ export type Analysis = {
   kind: SessionKind;
   title: string;
   summary: string;
-  decisions: string[];
-  actions: string[];
-  questions: string[];
+  /// Il report completo in Markdown.
+  report: string;
 };
 
 let instance: Database | null = null;

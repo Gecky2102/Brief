@@ -14,11 +14,6 @@ function formatStamp(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function list(title: string, items: string[]): string {
-  if (items.length === 0) return "";
-  return `\n## ${title}\n\n${items.map((item) => `- ${item}`).join("\n")}\n`;
-}
-
 export function speakerOf(track: "mic" | "system"): string {
   return track === "mic" ? "Io" : "Interlocutore";
 }
@@ -36,16 +31,14 @@ export function toMarkdown(
     `- **Durata**: ${formatDuration(session.duration_ms)}`,
     `- **Tipo**: ${KIND_LABELS[session.kind]}`,
     "",
+    "---",
+    "",
   ].join("\n");
 
-  const summary = analysis?.summary
-    ? `## Riassunto\n\n${analysis.summary}\n`
-    : "";
-
-  const sections = analysis
-    ? list("Decisioni", analysis.decisions) +
-      list("Da fare", analysis.actions) +
-      list("Domande aperte", analysis.questions)
+  // Il report è già Markdown completo: si innesta così com'è, togliendo il
+  // suo titolo per non averne due.
+  const report = analysis?.report
+    ? `${analysis.report.replace(/^#\s+.*\n/, "")}\n\n---\n\n`
     : "";
 
   const transcript = segments
@@ -55,7 +48,7 @@ export function toMarkdown(
     )
     .join("\n\n");
 
-  return `${header}${summary}${sections}\n## Trascrizione\n\n${transcript}\n`;
+  return `${header}${report}## Trascrizione integrale\n\n${transcript}\n`;
 }
 
 export function fileNameFor(session: Session): string {

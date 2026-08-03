@@ -51,9 +51,12 @@ export default function Recorder({ onFinished }: Props) {
   const [download, setDownload] = useState<DownloadProgress | null>(null);
   const [modelReady, setModelReady] = useState<boolean | null>(null);
   const [systemWarning, setSystemWarning] = useState<string | null>(null);
-  const [importing, setImporting] = useState<{ done: number; total: number } | null>(
-    null,
-  );
+  const [importing, setImporting] = useState<{
+    done: number;
+    total: number;
+    eta: number;
+  } | null>(null);
+  const importStarted = useRef<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   const startedAt = useRef<Date | null>(null);
@@ -88,9 +91,18 @@ export default function Recorder({ onFinished }: Props) {
         }).catch(() => undefined);
       }),
       onTranscriptError(setError),
-      onImportProgress((event) =>
-        setImporting({ done: event.done_ms, total: event.total_ms }),
-      ),
+      onImportProgress((event) => {
+        // Stima il tempo mancante dal ritmo tenuto finora: whisper procede in
+        // modo abbastanza regolare da renderla attendibile.
+        const trascorso = Date.now() - importStarted.current;
+        const frazione = event.done_ms / Math.max(event.total_ms, 1);
+        const eta = frazione > 0.01 ? (trascorso / frazione) * (1 - frazione) : 0;
+        setImporting({
+          done: event.done_ms,
+          total: event.total_ms,
+          eta: Math.round(eta),
+        });
+      }),
       onDownloadProgress((event) => {
         setDownload(event.downloaded >= event.total ? null : event);
       }),
@@ -213,7 +225,8 @@ export default function Recorder({ onFinished }: Props) {
   async function runImport() {
     setError(null);
     setLines([]);
-    setImporting({ done: 0, total: 1 });
+    importStarted.current = Date.now();
+    setImporting({ done: 0, total: 1, eta: 0 });
     try {
       const begunAt = new Date();
       const id = await createSession(begunAt.toISOString());
@@ -300,23 +313,33 @@ export default function Recorder({ onFinished }: Props) {
       </div>
 
       {importing && (
-        <div className="w-full max-w-md space-y-2 rounded-lg border border-edge bg-surface-raised px-4 py-3">
-          <span className="flex items-center gap-2 text-xs">
-            <Spinner />
-            Trascrizione del file in corso
-            {importing.total > 1 && (
-              <span className="ml-auto font-mono text-ink-muted">
-                {Math.round((importing.done / importing.total) * 100)}%
-              </span>
-            )}
-          </span>
+        <div className="w-full max-w-md space-y-2.5 rounded-xl border border-edge bg-surface-raised px-4 py-3.5">
+          <div className="flex items-baseline justify-between">
+            <span className="flex items-center gap-2 text-xs">
+              <Spinner />
+              Trascrizione del file
+            </span>
+            <span className="text-2xl font-light tabular-nums">
+              {Math.round((importing.done / Math.max(importing.total, 1)) * 100)}%
+            </span>
+          </div>
+
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunken">
             <div
-              className="h-full rounded-full bg-accent transition-[width]"
+              className="h-full rounded-full bg-accent transition-[width] duration-300"
               style={{
                 width: `${Math.round((importing.done / Math.max(importing.total, 1)) * 100)}%`,
               }}
             />
+          </div>
+
+          <div className="flex justify-between text-[11px] text-ink-muted">
+            <span>
+              {formatClock(importing.done)} di {formatClock(importing.total)}
+            </span>
+            {importing.eta > 0 && (
+              <span>circa {formatClock(importing.eta)} rimanenti</span>
+            )}
           </div>
         </div>
       )}

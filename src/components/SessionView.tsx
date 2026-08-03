@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Spinner from "./Spinner";
+import ReportView from "./ReportView";
 import {
   KIND_LABELS,
   listSegments,
@@ -37,25 +38,6 @@ function formatStamp(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function Bullets({ title, items }: { title: string; items: string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-        {title}
-      </h3>
-      <ul className="space-y-1.5">
-        {items.map((item, index) => (
-          <li key={index} className="flex gap-2 text-sm leading-relaxed">
-            <span className="text-accent">•</span>
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -66,6 +48,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState(session.title);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [tab, setTab] = useState<"report" | "transcript">("report");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -218,11 +201,11 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             className="brief-button-primary px-3 py-1.5 text-xs disabled:opacity-40"
           >
             {analyzing ? (
-              <Spinner label="Analisi in corso…" />
+              <Spinner label="Scrittura in corso…" />
             ) : analysis ? (
-              "Rigenera analisi"
+              "Rigenera report"
             ) : (
-              "Analizza sessione"
+              "Genera report"
             )}
           </button>
           <button
@@ -287,6 +270,22 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
         {error && <p className="rounded-md border border-live/40 bg-live/10 px-3 py-2 text-xs leading-relaxed text-live">{error}</p>}
       </header>
 
+      <div className="flex gap-1 border-b border-edge px-8">
+        {(["report", "transcript"] as const).map((value) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className={`-mb-px border-b-2 px-3 py-2 text-xs transition-colors ${
+              tab === value
+                ? "border-accent font-medium text-ink"
+                : "border-transparent text-ink-muted hover:text-ink"
+            }`}
+          >
+            {value === "report" ? "Report" : "Trascrizione"}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-8 px-8 py-6">
         {analyzing && (
           <div className="space-y-3 rounded-xl border border-edge bg-surface-raised/40 p-5">
@@ -328,26 +327,21 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
           </div>
         )}
 
-        {analysis && (
-          <div className="space-y-6 rounded-lg border border-edge bg-surface-raised/40 p-5">
-            {analysis.summary && (
-              <section className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                  Riassunto
-                </h3>
-                <p className="text-sm leading-relaxed">{analysis.summary}</p>
-              </section>
-            )}
-            <Bullets title="Decisioni" items={analysis.decisions} />
-            <Bullets title="Da fare" items={analysis.actions} />
-            <Bullets title="Domande aperte" items={analysis.questions} />
-          </div>
-        )}
+        {tab === "report" &&
+          (analysis?.report ? (
+            <ReportView markdown={analysis.report} />
+          ) : (
+            !analyzing && (
+              <p className="mx-auto max-w-md py-10 text-center text-xs leading-relaxed text-ink-muted">
+                Nessun report per questa sessione. Premi «Genera report» per
+                produrre un documento completo a partire dalla trascrizione.
+              </p>
+            )
+          ))}
 
+
+        {tab === "transcript" && (
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Trascrizione
-          </h3>
           {segments.length === 0 ? (
             <p className="text-sm text-ink-muted">
               Nessun parlato riconosciuto in questa sessione.
@@ -401,6 +395,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             ))
           )}
         </section>
+        )}
       </div>
     </div>
   );

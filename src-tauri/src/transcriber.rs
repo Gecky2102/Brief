@@ -270,6 +270,7 @@ pub fn transcribe_samples(
             },
         );
 
+
         offset = end;
     }
 

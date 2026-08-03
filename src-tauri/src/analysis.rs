@@ -4,7 +4,10 @@ use tauri::{AppHandle, Emitter};
 use crate::provider::{self, Request};
 use crate::settings;
 
-const MAX_OUTPUT_TOKENS: u32 = 4000;
+/// Un report di 1500-3000 parole richiede spazio: con un tetto basso il
+/// documento veniva troncato a metà.
+const REPORT_TOKENS: u32 = 16_000;
+const NOTES_TOKENS: u32 = 2_000;
 /// Oltre questa lunghezza la trascrizione viene riassunta a blocchi: i modelli
 /// hanno finestre ampie, ma un testo enorme fa perdere i dettagli.
 const CHUNK_CHARS: usize = 24_000;
@@ -20,12 +23,11 @@ pub struct TranscriptLine {
 pub struct Analysis {
     pub kind: String,
     pub title: String,
+    /// Due frasi per la libreria e l'anteprima.
     pub summary: String,
+    /// Il report vero e proprio, in Markdown.
     #[serde(default)]
-    pub points: Vec<String>,
-    pub decisions: Vec<String>,
-    pub actions: Vec<String>,
-    pub questions: Vec<String>,
+    pub report: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -37,49 +39,62 @@ pub struct AnalysisProgress {
     preview: String,
 }
 
-const SYSTEM_FINALE: &str = "Sei un assistente che analizza trascrizioni di riunioni in italiano. \
-Rispondi SOLO con righe etichettate, una per riga, in questo formato esatto:
+const SYSTEM_REPORT: &str = "Sei un analista che redige report professionali in italiano \
+a partire da trascrizioni di riunioni, lezioni e conversazioni di lavoro.
+
+Produci un documento in Markdown, lungo e approfondito: da 1500 a 3000 parole. \
+Non è un riassunto, è un documento di lavoro che una persona assente deve poter leggere \
+al posto di aver partecipato.
+
+Struttura da seguire, adattandola al contenuto reale:
+
+# <titolo del documento>
+
+## Quadro generale
+Contesto, partecipanti (con i nomi che compaiono), scopo dell'incontro, come si è svolto.
+
+## <un titolo per ciascun tema affrontato>
+Una sezione per ogni argomento di sostanza, in ordine di importanza. Dentro ogni sezione \
+spiega il problema, le posizioni emerse, i dettagli tecnici, i numeri, i sistemi e gli \
+strumenti citati. Usa sottosezioni, elenchi puntati e tabelle dove aiutano a leggere.
+
+## Decisioni prese
+Tabella con le colonne | Decisione | Motivazione | Chi decide |
+
+## Attività da svolgere
+Tabella con le colonne | Attività | Responsabile | Scadenza |
+Se una informazione non emerge dalla trascrizione scrivi «non indicato».
+
+## Punti aperti
+Elenco delle questioni rimaste irrisolte, ciascuna con una riga di contesto.
+
+## Rischi e criticità
+Ostacoli, dipendenze e problemi segnalati durante la discussione.
+
+Regole: scrivi in italiano corretto e professionale, in prosa distesa, non telegrafica. \
+Conserva nomi di persone, aziende, sistemi, prodotti, cifre e date esattamente come compaiono. \
+La trascrizione è automatica e contiene errori di riconoscimento: ignora le parole \
+incomprensibili senza segnalarle e senza inventarci sopra. \
+Non aggiungere premesse, scuse o commenti sul tuo lavoro: produci solo il documento.";
+
+const SYSTEM_BLOCCO: &str = "Sei un assistente che prende appunti dettagliati da trascrizioni \
+di riunioni in italiano. Riporta tutto ciò che di rilevante viene detto in questo estratto: \
+argomenti, posizioni espresse, problemi concreti, dettagli tecnici, decisioni, cose da fare, \
+domande aperte. Conserva nomi di persone, aziende, sistemi, prodotti, cifre e date esattamente \
+come compaiono: serviranno per il report finale. Non sintetizzare troppo: questi appunti \
+sostituiscono la trascrizione originale. La trascrizione è automatica e contiene errori: \
+ignora le parole incomprensibili invece di inventarle. Rispondi con un elenco puntato in italiano.";
+
+const SYSTEM_INTESTAZIONE: &str = "Leggi il report e rispondi con tre righe etichettate, \
+nient'altro:
 
 TIPO: <work_call|meeting|lecture|interview|casual>
-TITOLO: <massimo 8 parole>
-RIASSUNTO: <resoconto disteso, vedi sotto>
-PUNTO: <un argomento trattato, spiegato in 2-3 frasi>
-DECISIONE: <una decisione presa e perché>
-AZIONE: <una cosa da fare, all'infinito, con il responsabile fra parentesi se emerge>
-DOMANDA: <una domanda rimasta aperta>
+TITOLO: <titolo breve, massimo 8 parole, in italiano>
+SOMMARIO: <due frasi che dicono di cosa tratta il documento>";
 
-Il RIASSUNTO deve essere lungo e sostanzioso: da 200 a 400 parole su una sola riga, \
-scritto in prosa scorrevole. Racconta come si è svolta la discussione, chi ha sostenuto \
-cosa, quali problemi concreti sono emersi, quali numeri, nomi, sistemi e scadenze sono \
-stati citati, e a che punto si è arrivati. Non limitarti a dire di cosa si è parlato: \
-spiega il contenuto, come faresti con un collega che non c'era. \
-Evita formule vaghe come «si è discusso di vari argomenti».
-
-Aggiungi una riga PUNTO per ogni argomento affrontato, da 4 a 10 righe, ciascuna con \
-qualche frase di sostanza. Ripeti allo stesso modo DECISIONE, AZIONE e DOMANDA, fino a 8 \
-voci ciascuna, tutte diverse. Ometti una riga solo se davvero non hai nulla da dire. \
-Conserva i nomi propri di persone, aziende, sistemi e prodotti così come compaiono. \
-La trascrizione è automatica e contiene errori di riconoscimento: ignora le parole \
-incomprensibili invece di inventarci sopra, e non segnalarle. Scrivi ogni parola in italiano. \
-Non aggiungere altro testo oltre alle righe etichettate.";
-
-const SYSTEM_BLOCCO: &str = "Sei un assistente che riassume trascrizioni di riunioni in italiano. \
-Riporta in modo dettagliato ciò che viene detto in questo estratto: argomenti trattati, \
-posizioni espresse, problemi concreti emersi, decisioni prese, cose da fare, domande aperte. \
-Sii generoso nei dettagli: numeri, nomi di persone, aziende, sistemi, prodotti e scadenze \
-vanno conservati esattamente come compaiono, perché serviranno per la sintesi finale. \
-Non riassumere in due righe: usa un elenco puntato ricco, una voce per ogni cosa rilevante. \
-La trascrizione è automatica e contiene errori: ignora le parole incomprensibili invece di \
-inventarle. Rispondi solo con l'elenco puntato, scritto interamente in italiano.";
-
-/// Legge le righe etichettate prodotte dal modello. Le righe che non riconosce
-/// vengono ignorate: capita che il modello aggiunga commenti.
-fn parse_labelled(raw: &str) -> Analysis {
-    let mut analysis = Analysis {
-        kind: "unknown".into(),
-        ..Default::default()
-    };
-
+/// Legge le tre righe di intestazione. Le righe non riconosciute vengono
+/// ignorate: capita che il modello aggiunga commenti.
+fn parse_header(raw: &str, analysis: &mut Analysis) {
     for line in raw.lines() {
         let line = line.trim().trim_start_matches(['-', '*', '#', ' ']);
         let Some((label, value)) = line.split_once(':') else {
@@ -89,27 +104,23 @@ fn parse_labelled(raw: &str) -> Analysis {
         if value.is_empty() {
             continue;
         }
-
         match label.trim().to_uppercase().as_str() {
             "TIPO" => analysis.kind = value.to_lowercase(),
             "TITOLO" => analysis.title = value,
-            "RIASSUNTO" => analysis.summary = value,
-            "PUNTO" => push_unique(&mut analysis.points, value),
-            "DECISIONE" => push_unique(&mut analysis.decisions, value),
-            "AZIONE" => push_unique(&mut analysis.actions, value),
-            "DOMANDA" => push_unique(&mut analysis.questions, value),
+            "SOMMARIO" => analysis.summary = value,
             _ => {}
         }
     }
-
-    analysis
 }
 
-fn push_unique(list: &mut Vec<String>, value: String) {
-    let normalized = value.to_lowercase();
-    if list.len() < 10 && !list.iter().any(|v| v.to_lowercase() == normalized) {
-        list.push(value);
-    }
+/// Ricava un titolo dal primo heading del report, quando il modello non
+/// produce l'intestazione richiesta.
+fn title_from_report(report: &str) -> String {
+    report
+        .lines()
+        .find(|line| line.starts_with("# "))
+        .map(|line| line.trim_start_matches('#').trim().to_string())
+        .unwrap_or_else(|| "Report della sessione".into())
 }
 
 fn render_transcript(lines: &[TranscriptLine]) -> String {
@@ -136,6 +147,7 @@ impl Session<'_> {
         phase: &'static str,
         step: usize,
         steps: usize,
+        max_tokens: u32,
     ) -> Result<String, String> {
         let mut accumulato = String::new();
         let mut ultimo = std::time::Instant::now();
@@ -148,7 +160,7 @@ impl Session<'_> {
                 model: &self.settings.model,
                 system,
                 user,
-                max_tokens: MAX_OUTPUT_TOKENS,
+                max_tokens,
             },
             |delta| {
                 accumulato.push_str(delta);
@@ -203,11 +215,11 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
 
     let transcript = render_transcript(&lines);
 
-    let raw = if transcript.chars().count() <= SINGLE_PASS_CHARS {
-        session.ask(SYSTEM_FINALE, &transcript, "writing", 0, 1)?
+    let report = if transcript.chars().count() <= SINGLE_PASS_CHARS {
+        session.ask(SYSTEM_REPORT, &transcript, "writing", 0, 1, REPORT_TOKENS)?
     } else {
-        // Riassume ogni blocco, poi costruisce la sintesi finale sui riassunti:
-        // così nessuna parte della riunione resta fuori.
+        // Prima note dettagliate blocco per blocco, poi il documento finale:
+        // così nessuna parte della riunione resta fuori dal report.
         let characters: Vec<char> = transcript.chars().collect();
         let blocchi: Vec<String> = characters
             .chunks(CHUNK_CHARS)
@@ -223,17 +235,50 @@ fn analyze_blocking(app: AppHandle, lines: Vec<TranscriptLine>) -> Result<Analys
                 "reading",
                 indice,
                 totale + 1,
+                NOTES_TOKENS,
             )?;
             parziali.push_str(&testo);
-            parziali.push('\n');
+            parziali.push_str("\n\n");
         }
 
-        session.ask(SYSTEM_FINALE, &parziali, "writing", totale, totale + 1)?
+        session.ask(
+            SYSTEM_REPORT,
+            &format!(
+                "Note prese durante la riunione, in ordine cronologico:\n\n{parziali}"
+            ),
+            "writing",
+            totale,
+            totale + 1,
+            REPORT_TOKENS,
+        )?
     };
 
-    let mut analysis = parse_labelled(&raw);
-    if analysis.summary.trim().is_empty() {
-        return Err("Il modello non ha prodotto un risultato leggibile.".into());
+    if report.trim().is_empty() {
+        return Err("Il modello non ha prodotto alcun report.".into());
+    }
+
+    // Intestazione a parte: chiedere titolo e tipo insieme al documento faceva
+    // sprecare al modello l'inizio della risposta.
+    let mut analysis = Analysis {
+        kind: "unknown".into(),
+        title: title_from_report(&report),
+        summary: String::new(),
+        report: report.clone(),
+    };
+
+    if let Ok(header) = session.ask(
+        SYSTEM_INTESTAZIONE,
+        &report.chars().take(6000).collect::<String>(),
+        "writing",
+        0,
+        1,
+        200,
+    ) {
+        parse_header(&header, &mut analysis);
+    }
+
+    if analysis.title.trim().is_empty() {
+        analysis.title = title_from_report(&report);
     }
 
     const KINDS: [&str; 5] = ["work_call", "meeting", "lecture", "interview", "casual"];
@@ -263,43 +308,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legge_le_righe_etichettate() {
-        let raw = "TIPO: meeting\n\
-TITOLO: Riunione gestionale\n\
-RIASSUNTO: Si è parlato del nuovo gestionale.\n\
-DECISIONE: Sostituire OneNote\n\
-AZIONE: Preparare le query SQL (io)\n\
-DOMANDA: Quale database usare?\n\
-Nota finale ignorata";
-
-        let analysis = parse_labelled(raw);
+    fn legge_l_intestazione() {
+        let mut analysis = Analysis::default();
+        parse_header(
+            "TIPO: meeting\nTITOLO: Riunione gestionale\nSOMMARIO: Documento sul nuovo gestionale.\nNota ignorata",
+            &mut analysis,
+        );
         assert_eq!(analysis.kind, "meeting");
         assert_eq!(analysis.title, "Riunione gestionale");
-        assert_eq!(analysis.decisions, vec!["Sostituire OneNote"]);
-        assert_eq!(analysis.actions, vec!["Preparare le query SQL (io)"]);
-        assert_eq!(analysis.questions, vec!["Quale database usare?"]);
+        assert_eq!(analysis.summary, "Documento sul nuovo gestionale.");
     }
 
     #[test]
-    fn scarta_i_doppioni_e_limita_le_voci() {
-        let mut raw = String::from("RIASSUNTO: prova\n");
-        for _ in 0..12 {
-            raw.push_str("AZIONE: Sentire Marco\n");
-        }
-        for indice in 0..12 {
-            raw.push_str(&format!("DECISIONE: Decisione {indice}\n"));
-        }
-
-        let analysis = parse_labelled(&raw);
-        assert_eq!(analysis.actions.len(), 1, "i doppioni vanno scartati");
-        assert_eq!(analysis.decisions.len(), 10, "al massimo dieci voci");
-    }
-
-    #[test]
-    fn tollera_elenchi_puntati() {
-        let analysis =
-            parse_labelled("- AZIONE: Inviare il preventivo\n* DECISIONE: Chiudere a 4000");
-        assert_eq!(analysis.actions, vec!["Inviare il preventivo"]);
-        assert_eq!(analysis.decisions, vec!["Chiudere a 4000"]);
+    fn ricava_il_titolo_dal_report() {
+        let report = "Premessa\n\n# Analisi del gestionale\n\nTesto…";
+        assert_eq!(title_from_report(report), "Analisi del gestionale");
+        assert_eq!(title_from_report("nessun titolo"), "Report della sessione");
     }
 }
