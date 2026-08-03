@@ -469,11 +469,16 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
                   ? `Lettura della trascrizione, parte ${progress.step + 1} di ${progress.steps - 1}`
                   : "Scrittura del riassunto"}
               </span>
-              {progress && progress.steps > 1 && (
-                <span className="font-mono">
-                  {Math.round(((progress.step + 1) / progress.steps) * 100)}%
-                </span>
-              )}
+              <span className="flex items-center gap-3 font-mono">
+                {progress && progress.words > 0 && (
+                  <span>{progress.words} parole</span>
+                )}
+                {progress && progress.steps > 1 && (
+                  <span>
+                    {Math.round(((progress.step + 1) / progress.steps) * 100)}%
+                  </span>
+                )}
+              </span>
             </div>
 
             {progress && progress.steps > 1 && (
@@ -488,9 +493,9 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             )}
 
             {progress?.preview ? (
-              <p className="max-h-52 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">
-                {progress.preview}
-              </p>
+              <div className="max-h-72 overflow-y-auto rounded-lg bg-surface-sunken/60 p-3">
+                <ReportView markdown={progress.preview} />
+              </div>
             ) : (
               <>
                 <div className="brief-skeleton h-3 w-full rounded" />

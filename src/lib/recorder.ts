@@ -115,6 +115,7 @@ export type AnalysisProgress = {
   step: number;
   steps: number;
   preview: string;
+  words: number;
 };
 
 export function getSettings(): Promise<Settings> {

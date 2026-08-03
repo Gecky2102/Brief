@@ -36,6 +36,8 @@ pub struct Analysis {
     pub report: String,
 }
 
+/// Segnala l'inizio di ogni fase con una stima del lavoro: su una riunione
+/// lunga l'analisi dura minuti e senza indicazioni sembra bloccata.
 #[derive(Clone, Serialize)]
 pub struct AnalysisProgress {
     /// «reading» mentre riassume i blocchi, «writing» durante la sintesi finale.
@@ -43,6 +45,8 @@ pub struct AnalysisProgress {
     step: usize,
     steps: usize,
     preview: String,
+    /// Parole prodotte finora: dà la misura di quanto sta crescendo il documento.
+    words: usize,
 }
 
 /// Struttura del documento in base al taglio scelto. Ogni taglio chiede sezioni
@@ -300,6 +304,7 @@ impl Session<'_> {
                             phase,
                             step,
                             steps,
+                            words: accumulato.split_whitespace().count(),
                             preview: accumulato.clone(),
                         },
                     );
@@ -318,6 +323,7 @@ impl Session<'_> {
                 phase,
                 step,
                 steps,
+                words: testo.split_whitespace().count(),
                 preview: testo.clone(),
             },
         );
