@@ -124,7 +124,11 @@ fn rms(samples: &[f32]) -> f32 {
     (sum / samples.len() as f32).sqrt()
 }
 
-fn transcribe(context: &WhisperContext, audio: &[f32]) -> Result<String, String> {
+fn transcribe(
+    context: &WhisperContext,
+    audio: &[f32],
+    precedente: Option<&str>,
+) -> Result<String, String> {
     let mut state = context
         .create_state()
         .map_err(|cause| format!("Stato Whisper non creato: {cause}"))?;
@@ -140,6 +144,16 @@ fn transcribe(context: &WhisperContext, audio: &[f32]) -> Result<String, String>
     // Senza lingua esplicita Whisper prova a indovinarla su ogni segmento e
     // sui pezzi brevi sbaglia, producendo inglese o "foreign language".
     params.set_language(Some("it"));
+
+    // Dare a Whisper la coda del segmento precedente lo aiuta con i nomi propri
+    // e con le frasi spezzate a metà fra due finestre.
+    if let Some(testo) = precedente {
+        let coda: String = testo.chars().rev().take(200).collect::<Vec<_>>()
+            .into_iter().rev().collect();
+        if !coda.trim().is_empty() {
+            params.set_initial_prompt(&coda);
+        }
+    }
 
     state
         .full(params, audio)
@@ -213,6 +227,7 @@ fn worker(
     let mut buffer: Vec<f32> = Vec::new();
     let mut buffer_start_ms: i64 = 0;
     let mut silence_ms: i64 = 0;
+    let mut ultimo_testo: Option<String> = None;
 
     let mut flush = |buffer: &mut Vec<f32>, buffer_start_ms: i64, end_ms: i64| {
         if buffer.is_empty() {
@@ -226,8 +241,9 @@ fn worker(
             return;
         }
 
-        match transcribe(&context, &audio) {
+        match transcribe(&context, &audio, ultimo_testo.as_deref()) {
             Ok(text) if !is_noise(&text) => {
+                ultimo_testo = Some(text.clone());
                 // Il microfono è sempre chi usa Brief: non serve riconoscerlo.
                 let voice = if track == "mic" {
                     None
@@ -318,6 +334,7 @@ pub fn transcribe_samples(
 
     let window = (SAMPLE_RATE * MAX_SEGMENT_MS / 1000) as usize;
     let mut offset = 0_usize;
+    let mut precedente: Option<String> = None;
 
     while offset < samples.len() {
         let end = (offset + window).min(samples.len());
@@ -326,8 +343,9 @@ pub fn transcribe_samples(
         let end_ms = (end as i64) * 1000 / SAMPLE_RATE;
 
         if rms(chunk) >= SILENCE_RMS {
-            match transcribe(&context, chunk) {
+            match transcribe(&context, chunk, precedente.as_deref()) {
                 Ok(text) if !is_noise(&text) => {
+                    precedente = Some(text.clone());
                     let _ = app.emit(
                         "transcript://segment",
                         SegmentEvent {
@@ -488,8 +506,9 @@ mod integration {
                 scartati += 1;
                 continue;
             }
-            match transcribe(&context, chunk) {
+            match transcribe(&context, chunk, None) {
                 Ok(text) if !is_noise(&text) => {
+
                     tenuti += 1;
                     let secondi = index * (MAX_SEGMENT_MS as usize) / 1000;
                     println!("[{:02}:{:02}] {text}", secondi / 60, secondi % 60);
@@ -513,7 +532,7 @@ mod integration {
             WhisperContext::new_with_params(&model, WhisperContextParameters::default())
                 .expect("modello caricato");
 
-        let text = transcribe(&context, &read_wav_mono16(&wav)).expect("trascrizione");
+        let text = transcribe(&context, &read_wav_mono16(&wav), None).expect("trascrizione");
         println!("TRASCRITTO: {text}");
 
         assert!(!is_noise(&text), "la trascrizione è stata scartata come rumore");
