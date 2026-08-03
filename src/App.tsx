@@ -12,6 +12,28 @@ import {
 } from "./lib/db";
 import { deleteRecording } from "./lib/recorder";
 
+/// Raggruppa per periodo come fanno Foto e Note: scorrere una lista piatta di
+/// cento sessioni è scomodo.
+function periodOf(iso: string): string {
+  const data = new Date(iso);
+  const oggi = new Date();
+  const ieri = new Date(oggi);
+  ieri.setDate(oggi.getDate() - 1);
+
+  const stessoGiorno = (a: Date, b: Date) =>
+    a.toDateString() === b.toDateString();
+
+  if (stessoGiorno(data, oggi)) return "Oggi";
+  if (stessoGiorno(data, ieri)) return "Ieri";
+
+  const giorniFa = (oggi.getTime() - data.getTime()) / 86400000;
+  if (giorniFa < 7) return "Ultimi sette giorni";
+  if (data.getFullYear() === oggi.getFullYear()) {
+    return data.toLocaleDateString("it-IT", { month: "long" });
+  }
+  return data.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+}
+
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -63,7 +85,14 @@ export default function App() {
   // ⌘F porta alla ricerca, Esc la svuota o torna al registratore.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.metaKey && event.key === "f") {
+      if (event.metaKey && event.key === ",") {
+        event.preventDefault();
+        setShowSettings(true);
+      } else if (event.metaKey && event.key === "n") {
+        event.preventDefault();
+        setShowSettings(false);
+        setSelectedId(null);
+      } else if (event.metaKey && event.key === "f") {
         event.preventDefault();
         searchInput.current?.focus();
         searchInput.current?.select();
@@ -142,9 +171,18 @@ export default function App() {
                 : "Nessuna sessione registrata."}
             </p>
           )}
-          {sessions.map((session) => (
+          {sessions.map((session, indice) => {
+            const periodo = periodOf(session.started_at);
+            const nuovoPeriodo =
+              indice === 0 || periodOf(sessions[indice - 1].started_at) !== periodo;
+            return (
+              <div key={session.id}>
+                {nuovoPeriodo && (
+                  <span className="mt-3 mb-1 block px-2 text-[11px] font-medium uppercase tracking-wide text-ink-muted first:mt-1">
+                    {periodo}
+                  </span>
+                )}
             <button
-              key={session.id}
               onClick={() => {
                 setShowSettings(false);
                 setSelectedId(session.id);
@@ -168,7 +206,9 @@ export default function App() {
                 · {formatDuration(session.duration_ms)}
               </span>
             </button>
-          ))}
+              </div>
+            );
+          })}
         </nav>
 
         {sessions.length > 0 && (

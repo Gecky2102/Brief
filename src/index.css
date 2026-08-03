@@ -254,3 +254,56 @@ textarea::placeholder {
 .brief-report table tr:hover td {
   background-color: var(--surface-sunken);
 }
+
+
+/* In stampa resta solo il documento: niente barra laterale, niente pulsanti,
+   colori pieni su fondo bianco e sezioni che non si spezzano a metà. */
+@media print {
+  @page {
+    margin: 20mm 18mm;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+    overflow: visible;
+    font-size: 11pt;
+  }
+
+  aside,
+  header,
+  .brief-noprint,
+  button,
+  input,
+  select,
+  textarea {
+    display: none !important;
+  }
+
+  .brief-content,
+  main,
+  #root,
+  html {
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+  }
+
+  .brief-report {
+    max-width: none;
+  }
+
+  .brief-report h2,
+  .brief-report h3 {
+    break-after: avoid;
+  }
+
+  .brief-report table,
+  .brief-report li {
+    break-inside: avoid;
+  }
+
+  .brief-report h2::before {
+    color: #000;
+  }
+}

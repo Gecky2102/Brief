@@ -5,12 +5,51 @@ type Props = {
   markdown: string;
 };
 
+/// Indice cliccabile ricavato dai titoli di secondo livello: su un documento
+/// di tremila parole scorrere alla cieca è scomodo.
+function Indice({ markdown }: { markdown: string }) {
+  const voci = markdown
+    .split("\n")
+    .filter((riga) => riga.startsWith("## "))
+    .map((riga) => riga.slice(3).trim());
+
+  if (voci.length < 3) return null;
+
+  return (
+    <nav className="brief-noprint mb-8 rounded-xl border border-edge bg-surface-raised/50 p-4">
+      <span className="mb-2 block text-[11px] font-medium uppercase tracking-wide text-ink-muted">
+        Contenuto
+      </span>
+      <ol className="space-y-1 text-[12.5px]">
+        {voci.map((voce, indice) => (
+          <li key={indice}>
+            <button
+              onClick={() =>
+                document
+                  .getElementById(`sezione-${indice}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              className="text-left hover:text-accent"
+            >
+              <span className="mr-2 tabular-nums text-ink-muted">
+                {indice + 1}.
+              </span>
+              {voce}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 /// Il report arriva da un modello, quindi è testo non fidato: si rende come
 /// Markdown senza abilitare l'HTML grezzo, così un documento malevolo non può
 /// iniettare markup nella pagina.
 export default function ReportView({ markdown }: Props) {
   return (
     <article className="brief-report mx-auto max-w-[46rem] pb-12 text-[13.5px] leading-[1.75]">
+      <Indice markdown={markdown} />
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -19,11 +58,23 @@ export default function ReportView({ markdown }: Props) {
               {children}
             </h1>
           ),
-          h2: ({ children }) => (
-            <h2 className="mb-3 mt-10 text-[19px] font-semibold tracking-tight">
-              {children}
-            </h2>
-          ),
+          h2: ({ children, node }) => {
+            // L'ancora serve all'indice: si ricava dalla posizione del titolo
+            // nel documento, la stessa che usa l'indice per numerarli.
+            const riga = node?.position?.start.line ?? 0;
+            const precedenti = markdown
+              .split("\n")
+              .slice(0, riga - 1)
+              .filter((r) => r.startsWith("## ")).length;
+            return (
+              <h2
+                id={`sezione-${precedenti}`}
+                className="mb-3 mt-10 scroll-mt-6 text-[19px] font-semibold tracking-tight"
+              >
+                {children}
+              </h2>
+            );
+          },
           h3: ({ children }) => (
             <h3 className="mb-1.5 mt-7 text-[15px] font-semibold text-ink">
               {children}

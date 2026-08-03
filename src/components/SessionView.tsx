@@ -3,6 +3,7 @@ import Spinner from "./Spinner";
 import ReportView from "./ReportView";
 import SpeakerBar, { speakerColor } from "./SpeakerBar";
 import AudioPlayer from "./AudioPlayer";
+import SpeakerStats from "./SpeakerStats";
 import {
   KIND_LABELS,
   listSegments,
@@ -50,6 +51,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [audioPath, setAudioPath] = useState<string | null>(null);
   const [seekTo, setSeekTo] = useState<number | null>(null);
+  const [filter, setFilter] = useState("");
   const [playhead, setPlayhead] = useState(0);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -165,6 +167,12 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
     onChanged();
   }
 
+  function stampaReport() {
+    // La stampa di sistema di macOS offre «Salva come PDF»: è il modo più
+    // diretto per avere il documento impaginato senza un motore PDF a bordo.
+    window.print();
+  }
+
   async function saveMarkdown() {
     setError(null);
     try {
@@ -241,6 +249,13 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             ) : (
               "Genera report"
             )}
+          </button>
+          <button
+            onClick={stampaReport}
+            disabled={!analysis?.report}
+            className="brief-button px-3 py-1.5 text-xs disabled:opacity-40"
+          >
+            Esporta PDF
           </button>
           <button
             onClick={copyToClipboard}
@@ -388,6 +403,15 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
             onMerge={unisci}
           />
 
+          <SpeakerStats segments={segments} speakers={speakers} />
+
+          <input
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+            placeholder="Filtra le righe della trascrizione"
+            className="brief-field w-full px-3 py-1.5 text-xs"
+          />
+
           {audioPath && (
             <AudioPlayer
               path={audioPath}
@@ -400,7 +424,16 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
               Nessun parlato riconosciuto in questa sessione.
             </p>
           ) : (
-            segments.map((segment) => (
+            segments
+              .filter(
+                (segment) =>
+                  !filter.trim() ||
+                  segment.text.toLowerCase().includes(filter.toLowerCase()) ||
+                  (segment.speaker_label ?? "")
+                    .toLowerCase()
+                    .includes(filter.toLowerCase()),
+              )
+              .map((segment) => (
               <div
                 key={segment.id}
                 className={`group -mx-2 flex gap-3 rounded-md px-2 py-1 transition-colors ${
