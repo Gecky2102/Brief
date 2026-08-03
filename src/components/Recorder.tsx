@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import LevelMeter from "./LevelMeter";
 import Spinner from "./Spinner";
-import QualityPicker from "./QualityPicker";
 import { addSegment, createSession, finishSession } from "../lib/db";
 import { speakerOf } from "../lib/markdown";
 import {
@@ -294,8 +293,6 @@ export default function Recorder({ onFinished }: Props) {
           una connessione solo per questo.
         </p>
       )}
-
-      {!recording && !busy && <QualityPicker />}
 
       <div className="w-full max-w-md space-y-2.5">
         <LevelMeter label="Microfono" rms={levels.mic} active={recording} />

@@ -18,7 +18,9 @@ import {
   analyzeSession,
   exportAudio,
   exportMarkdown,
+  onAnalysisProgress,
   onDownloadProgress,
+  type AnalysisProgress,
   type DownloadProgress,
 } from "../lib/recorder";
 
@@ -59,6 +61,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [download, setDownload] = useState<DownloadProgress | null>(null);
+  const [progress, setProgress] = useState<AnalysisProgress | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState(session.title);
@@ -78,16 +81,20 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
   useEffect(load, [load]);
 
   useEffect(() => {
-    const subscription = onDownloadProgress((event) =>
-      setDownload(event.downloaded >= event.total ? null : event),
-    );
+    const subscriptions = [
+      onDownloadProgress((event) =>
+        setDownload(event.downloaded >= event.total ? null : event),
+      ),
+      onAnalysisProgress(setProgress),
+    ];
     return () => {
-      subscription.then((unlisten) => unlisten());
+      subscriptions.forEach((s) => s.then((unlisten) => unlisten()));
     };
   }, []);
 
   async function runAnalysis() {
     setAnalyzing(true);
+    setProgress(null);
     setError(null);
     try {
       const lines = segments.map((segment) => ({
@@ -95,7 +102,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
         text: segment.text,
       }));
       const result = await analyzeSession(lines);
-      await saveAnalysis(session.id, result, "qwen2.5-3b-instruct-q4_k_m");
+      await saveAnalysis(session.id, result, "provider-online");
       setAnalysis(result);
 
       // Il tipo proposto dall'IA viene applicato, ma resta modificabile: la
@@ -112,6 +119,7 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       setError(String(cause));
     } finally {
       setAnalyzing(false);
+      setProgress(null);
       setDownload(null);
     }
   }
@@ -280,15 +288,43 @@ export default function SessionView({ session, onChanged, onDelete }: Props) {
       </header>
 
       <div className="space-y-8 px-8 py-6">
-        {analyzing && !analysis && (
+        {analyzing && (
           <div className="space-y-3 rounded-xl border border-edge bg-surface-raised/40 p-5">
-            <p className="text-xs text-ink-muted">
-              Il modello legge la trascrizione e prepara riassunto, decisioni e
-              cose da fare. Su registrazioni lunghe può richiedere un minuto.
-            </p>
-            <div className="brief-skeleton h-3 w-full rounded" />
-            <div className="brief-skeleton h-3 w-5/6 rounded" />
-            <div className="brief-skeleton h-3 w-2/3 rounded" />
+            <div className="flex items-center justify-between text-xs text-ink-muted">
+              <span className="flex items-center gap-2">
+                <Spinner />
+                {progress?.phase === "reading"
+                  ? `Lettura della trascrizione, parte ${progress.step + 1} di ${progress.steps - 1}`
+                  : "Scrittura del riassunto"}
+              </span>
+              {progress && progress.steps > 1 && (
+                <span className="font-mono">
+                  {Math.round(((progress.step + 1) / progress.steps) * 100)}%
+                </span>
+              )}
+            </div>
+
+            {progress && progress.steps > 1 && (
+              <div className="h-1 overflow-hidden rounded-full bg-surface-sunken">
+                <div
+                  className="h-full rounded-full bg-accent transition-[width]"
+                  style={{
+                    width: `${Math.round(((progress.step + 1) / progress.steps) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
+
+            {progress?.preview ? (
+              <p className="max-h-52 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-ink-muted">
+                {progress.preview}
+              </p>
+            ) : (
+              <>
+                <div className="brief-skeleton h-3 w-full rounded" />
+                <div className="brief-skeleton h-3 w-5/6 rounded" />
+              </>
+            )}
           </div>
         )}
 

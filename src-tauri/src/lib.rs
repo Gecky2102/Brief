@@ -3,6 +3,7 @@ mod audio;
 mod export;
 mod import;
 mod models;
+mod provider;
 mod settings;
 mod transcriber;
 
@@ -43,7 +44,11 @@ pub fn run() {
             export::delete_recording,
             import::import_audio,
             settings::get_settings,
-            settings::set_settings
+            settings::set_settings,
+            settings::has_api_key,
+            settings::set_api_key,
+            models::storage_report,
+            models::delete_model
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

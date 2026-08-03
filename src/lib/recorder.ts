@@ -60,7 +60,42 @@ export function systemTrackHealth(): Promise<number> {
 }
 
 export type Quality = "fast" | "accurate";
-export type Settings = { quality: Quality };
+export type Provider =
+  | "anthropic"
+  | "openai"
+  | "google"
+  | "openrouter"
+  | "compatible";
+
+export type Settings = {
+  quality: Quality;
+  provider: Provider;
+  model: string;
+  base_url: string;
+};
+
+export type ModelStatus = {
+  key: string;
+  label: string;
+  file_name: string;
+  bytes: number;
+  on_disk: number;
+  complete: boolean;
+  in_use: boolean;
+};
+
+export type StorageReport = {
+  models: ModelStatus[];
+  used_bytes: number;
+  free_bytes: number;
+};
+
+export type AnalysisProgress = {
+  phase: "reading" | "writing";
+  step: number;
+  steps: number;
+  preview: string;
+};
 
 export function getSettings(): Promise<Settings> {
   return invoke<Settings>("get_settings");
@@ -68,6 +103,30 @@ export function getSettings(): Promise<Settings> {
 
 export function setSettings(settings: Settings): Promise<void> {
   return invoke<void>("set_settings", { settings });
+}
+
+export function hasApiKey(): Promise<boolean> {
+  return invoke<boolean>("has_api_key");
+}
+
+export function setApiKey(key: string): Promise<void> {
+  return invoke<void>("set_api_key", { key });
+}
+
+export function storageReport(): Promise<StorageReport> {
+  return invoke<StorageReport>("storage_report");
+}
+
+export function deleteModel(fileName: string): Promise<void> {
+  return invoke<void>("delete_model", { fileName });
+}
+
+export function onAnalysisProgress(
+  handler: (event: AnalysisProgress) => void,
+): Promise<UnlistenFn> {
+  return listen<AnalysisProgress>("analysis://progress", (event) =>
+    handler(event.payload),
+  );
 }
 
 export function modelsStatus(): Promise<ModelsStatus> {

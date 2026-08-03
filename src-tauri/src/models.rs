@@ -37,26 +37,6 @@ pub const WHISPER_ACCURATE: ModelSpec = ModelSpec {
     bytes: 574_041_195,
 };
 
-pub const LLM: ModelSpec = ModelSpec {
-    key: "llm",
-    label: "Modello di analisi",
-    file_name: "qwen2.5-3b-instruct-q4_k_m.gguf",
-    url: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
-    sha256: "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
-    bytes: 2_104_932_768,
-};
-
-/// Modello di analisi grande: estrae dettagli e nomi propri molto meglio del
-/// 3B, che su trascrizioni rumorose tende al generico.
-pub const LLM_ACCURATE: ModelSpec = ModelSpec {
-    key: "llm",
-    label: "Modello di analisi accurato",
-    file_name: "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
-    url: "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
-    sha256: "65b8fcd92af6b4fefa935c625d1ac27ea29dcb6ee14589c55a8f115ceaaa1423",
-    bytes: 4_683_074_240,
-};
-
 #[derive(Clone, Serialize)]
 struct DownloadProgress {
     key: &'static str,
@@ -209,4 +189,103 @@ pub fn ensure(app: &AppHandle, spec: &ModelSpec) -> Result<PathBuf, String> {
     );
 
     Ok(destination)
+}
+
+#[derive(Serialize)]
+pub struct ModelStatus {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub file_name: &'static str,
+    pub bytes: u64,
+    /// Byte già presenti su disco: uguale a `bytes` se completo, minore se il
+    /// download si è interrotto, zero se assente.
+    pub on_disk: u64,
+    pub complete: bool,
+    pub in_use: bool,
+}
+
+pub const ALL: [&ModelSpec; 2] = [&WHISPER, &WHISPER_ACCURATE];
+
+fn size_on_disk(dir: &std::path::Path, spec: &ModelSpec) -> (u64, bool) {
+    let complete = dir.join(spec.file_name);
+    if let Ok(meta) = std::fs::metadata(&complete) {
+        return (meta.len(), true);
+    }
+    let partial = complete.with_extension("part");
+    match std::fs::metadata(&partial) {
+        Ok(meta) => (meta.len(), false),
+        Err(_) => (0, false),
+    }
+}
+
+#[derive(Serialize)]
+pub struct StorageReport {
+    pub models: Vec<ModelStatus>,
+    pub used_bytes: u64,
+    pub free_bytes: u64,
+}
+
+#[tauri::command]
+pub fn storage_report(app: AppHandle) -> Result<StorageReport, String> {
+    let dir = models_dir(&app)?;
+    let quality = crate::settings::load(&app).quality;
+    let in_uso = [crate::settings::whisper_model_for(quality).file_name];
+
+    let mut models = Vec::new();
+    let mut used_bytes = 0;
+
+    for spec in ALL {
+        let (on_disk, complete) = size_on_disk(&dir, spec);
+        used_bytes += on_disk;
+        models.push(ModelStatus {
+            key: spec.key,
+            label: spec.label,
+            file_name: spec.file_name,
+            bytes: spec.bytes,
+            on_disk,
+            complete,
+            in_use: in_uso.contains(&spec.file_name),
+        });
+    }
+
+    // Spazio libero sul volume che ospita i modelli.
+    let free_bytes = free_space(&dir).unwrap_or(0);
+
+    Ok(StorageReport {
+        models,
+        used_bytes,
+        free_bytes,
+    })
+}
+
+fn free_space(path: &std::path::Path) -> Option<u64> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+
+    let raw = CString::new(path.as_os_str().as_bytes()).ok()?;
+    let mut stats: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(raw.as_ptr(), &mut stats) } != 0 {
+        return None;
+    }
+    Some(stats.f_bavail as u64 * stats.f_frsize as u64)
+}
+
+/// Elimina un modello scaricato, o il residuo di un download interrotto.
+#[tauri::command]
+pub fn delete_model(app: AppHandle, file_name: String) -> Result<(), String> {
+    // Solo i nomi noti: il valore arriva dal frontend e non deve poter
+    // indicare un file qualsiasi.
+    let spec = ALL
+        .iter()
+        .find(|spec| spec.file_name == file_name)
+        .ok_or_else(|| "Modello sconosciuto.".to_string())?;
+
+    let dir = models_dir(&app)?;
+    for path in [dir.join(spec.file_name), dir.join(spec.file_name).with_extension("part")] {
+        if path.exists() {
+            std::fs::remove_file(&path)
+                .map_err(|cause| format!("Impossibile eliminare il modello: {cause}"))?;
+        }
+    }
+    Ok(())
 }

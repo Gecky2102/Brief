@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Recorder from "./components/Recorder";
 import SessionView from "./components/SessionView";
+import SettingsPanel from "./components/SettingsPanel";
 import Spinner from "./components/Spinner";
 import {
   deleteSession,
@@ -34,6 +35,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [ready, setReady] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -104,12 +106,24 @@ export default function App() {
         <header className="space-y-3 px-4 pb-3 pt-10">
           <div className="flex items-center justify-between">
             <h1 className="text-sm font-semibold tracking-tight">Brief</h1>
-            <button
-              onClick={() => setSelectedId(null)}
-              className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
-            >
-              Nuova
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowSettings(true)}
+                title="Impostazioni"
+                className="rounded-md border border-edge px-2 py-1 text-xs text-ink-muted hover:bg-surface-raised hover:text-ink"
+              >
+                ⚙
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setSelectedId(null);
+                }}
+                className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white hover:opacity-90"
+              >
+                Nuova
+              </button>
+            </div>
           </div>
           <input
             ref={searchInput}
@@ -131,7 +145,10 @@ export default function App() {
           {sessions.map((session) => (
             <button
               key={session.id}
-              onClick={() => setSelectedId(session.id)}
+              onClick={() => {
+                setShowSettings(false);
+                setSelectedId(session.id);
+              }}
               className={`w-full rounded-md px-2 py-2 text-left transition-colors ${
                 session.id === selectedId
                   ? "bg-surface-raised"
@@ -160,7 +177,9 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-hidden pt-6">
-        {selected ? (
+        {showSettings ? (
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        ) : selected ? (
           <SessionView
             session={selected}
             onChanged={refresh}
