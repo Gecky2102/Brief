@@ -1,9 +1,9 @@
 //! Cattura audio su Windows.
 //!
-//! Su macOS il lavoro lo fa ScreenCaptureKit dal codice Swift; qui servono due
-//! strade diverse: il microfono passa da cpal, mentre l'audio di sistema si
-//! prende con il loopback di WASAPI, che è l'equivalente Windows della cattura
-//! dell'uscita audio.
+//! Su macOS il lavoro lo fa ScreenCaptureKit dal codice Swift. Qui entrambe le
+//! tracce passano da cpal: il microfono dal dispositivo di ingresso, l'audio di
+//! sistema aprendo in ingresso il dispositivo di uscita, che è il modo in cui
+//! WASAPI espone ciò che sta suonando.
 
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -18,7 +18,6 @@ const TRACK_SYSTEM: i32 = 1;
 const LEVEL_INTERVAL_MS: i64 = 50;
 
 struct Running {
-    stop: Arc<AtomicBool>,
     started_at: std::time::Instant,
     writers: Vec<Arc<Mutex<super::wav::WavWriter>>>,
     /// I flussi vanno tenuti in vita: rilasciandoli la cattura si ferma.
@@ -151,96 +150,53 @@ fn start_microphone(
     Ok((Box::new(stream), writer))
 }
 
-/// Audio di sistema tramite il loopback di WASAPI: si apre il dispositivo di
-/// uscita in modalità cattura e si legge ciò che sta suonando.
+/// Audio di sistema: su Windows il dispositivo di uscita si può aprire in
+/// ingresso, ed è così che WASAPI espone ciò che sta suonando. Non tutte le
+/// schede audio lo permettono, quindi il fallimento non è un errore fatale.
 fn start_system_loopback(
     directory: &std::path::Path,
     level: LevelCallback,
     samples: SamplesCallback,
     started_at: std::time::Instant,
-    stop: Arc<AtomicBool>,
-) -> Result<Arc<Mutex<super::wav::WavWriter>>, i32> {
+) -> Result<(Box<dyn std::any::Any + Send>, Arc<Mutex<super::wav::WavWriter>>), i32> {
+    let host = cpal::default_host();
+    let device = host.default_output_device().ok_or(2)?;
+
+    // Configurazione di ingresso sul dispositivo di uscita: è la richiesta di
+    // loopback vera e propria.
+    let config = device.default_input_config().map_err(|_| 2)?;
+
     let writer = Arc::new(Mutex::new(
         super::wav::WavWriter::create(&directory.join("system.wav")).map_err(|_| 6)?,
     ));
 
-    let writer_thread = writer.clone();
+    let canali = config.channels();
+    let rate = config.sample_rate().0;
+    let mut stato = TrackState {
+        track: TRACK_SYSTEM,
+        writer: writer.clone(),
+        level,
+        samples,
+        started_at,
+        last_level_ms: 0,
+        peak: 0.0,
+    };
 
-    std::thread::spawn(move || {
-        if wasapi::initialize_mta().is_err() {
-            return;
-        }
+    let stream = device
+        .build_input_stream(
+            &config.into(),
+            move |dati: &[f32], _| {
+                SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
+                stato.push(&to_mono_16k(dati, canali, rate));
+            },
+            |_| {},
+            None,
+        )
+        .map_err(|_| 2)?;
 
-        let Ok(device) = wasapi::get_default_device(&wasapi::Direction::Render) else {
-            return;
-        };
-        let Ok(mut client) = device.get_iaudioclient() else {
-            return;
-        };
-
-        let formato = wasapi::WaveFormat::new(32, 32, &wasapi::SampleType::Float, 48000, 2, None);
-        if client
-            .initialize_client(
-                &formato,
-                0,
-                &wasapi::Direction::Capture,
-                &wasapi::ShareMode::Shared,
-                true,
-            )
-            .is_err()
-        {
-            return;
-        }
-
-        let Ok(evento) = client.set_get_eventhandle() else {
-            return;
-        };
-        let Ok(cattura) = client.get_audiocaptureclient() else {
-            return;
-        };
-        if client.start_stream().is_err() {
-            return;
-        }
-
-        SYSTEM_STARTED.store(true, Ordering::Relaxed);
-
-        let mut stato = TrackState {
-            track: TRACK_SYSTEM,
-            writer: writer_thread,
-            level,
-            samples,
-            started_at,
-            last_level_ms: 0,
-            peak: 0.0,
-        };
-
-        let mut coda: std::collections::VecDeque<u8> = std::collections::VecDeque::new();
-
-        while !stop.load(Ordering::Relaxed) {
-            if evento.wait_for_event(200).is_err() {
-                continue;
-            }
-            if cattura.read_from_device_to_deque(&mut coda).is_err() {
-                continue;
-            }
-
-            if coda.is_empty() {
-                continue;
-            }
-
-            let grezzi: Vec<u8> = coda.drain(..).collect();
-            let campioni: Vec<f32> = grezzi
-                .chunks_exact(4)
-                .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-                .collect();
-
-            stato.push(&to_mono_16k(&campioni, 2, 48000));
-        }
-
-        let _ = client.stop_stream();
-    });
-
-    Ok(writer)
+    stream.play().map_err(|_| 2)?;
+    SYSTEM_STARTED.store(true, Ordering::Relaxed);
+    Ok((Box::new(stream), writer))
 }
 
 pub fn start(
@@ -256,28 +212,26 @@ pub fn start(
     SYSTEM_STARTED.store(false, Ordering::Relaxed);
 
     let started_at = std::time::Instant::now();
-    let stop = Arc::new(AtomicBool::new(false));
 
-    let (stream, mic_writer) = match start_microphone(directory, level, samples, started_at) {
+    let (mic_stream, mic_writer) = match start_microphone(directory, level, samples, started_at) {
         Ok(valore) => valore,
         Err(codice) => return codice,
     };
 
+    let mut writers = vec![mic_writer];
+    let mut streams: Vec<Box<dyn std::any::Any + Send>> = vec![mic_stream];
+
     // Come su macOS, l'audio di sistema è un di più: se non parte si registra
     // comunque il microfono.
-    let system_writer =
-        start_system_loopback(directory, level, samples, started_at, stop.clone()).ok();
-
-    let mut writers = vec![mic_writer];
-    if let Some(writer) = system_writer {
+    if let Ok((stream, writer)) = start_system_loopback(directory, level, samples, started_at) {
         writers.push(writer);
+        streams.push(stream);
     }
 
     *RUNNING.lock().unwrap() = Some(Running {
-        stop,
         started_at,
         writers,
-        _streams: vec![stream],
+        _streams: streams,
     });
 
     0
@@ -288,10 +242,9 @@ pub fn stop() -> i64 {
         return -1;
     };
 
-    running.stop.store(true, Ordering::Relaxed);
-    // Un istante perché il thread del loopback esca dal ciclo prima di chiudere
-    // i file.
-    std::thread::sleep(std::time::Duration::from_millis(250));
+    // I flussi si fermano quando vengono rilasciati con `running`: un istante
+    // perché le ultime richiamate finiscano prima di chiudere i file.
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     for writer in &running.writers {
         if let Ok(mut writer) = writer.lock() {

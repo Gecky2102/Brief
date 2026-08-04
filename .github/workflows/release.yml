@@ -59,6 +59,8 @@ jobs:
           releaseName: "Brief ${{ github.ref_name }}"
           releaseBody: "Trascina Brief nella cartella Applicazioni. Gli aggiornamenti successivi arrivano dall'app stessa."
           releaseDraft: false
+          # Una piattaforma che fallisce non deve impedire la pubblicazione
+          # delle altre.
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}

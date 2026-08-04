@@ -14,7 +14,7 @@ private let trackSystem: Int32 = 1
 /// microfono e l'audio di sistema hanno spesso livelli molto diversi, e
 /// Whisper lavora male sia sul troppo basso sia sul saturo.
 private let gainLock = NSLock()
-private var trackGain: [Float] = [1.0, 1.0]
+nonisolated(unsafe) private var trackGain: [Float] = [1.0, 1.0]
 
 func currentGain(_ track: Int32) -> Float {
     gainLock.lock()
@@ -290,17 +290,37 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
         return nil
     }
 
+    /// Contenitore per l'esito: Swift non permette di mutare una variabile
+    /// catturata da codice che gira in concorrenza, e il compilatore delle
+    /// versioni recenti lo rifiuta invece di avvisare soltanto.
+    private final class Esito: @unchecked Sendable {
+        private let lock = NSLock()
+        private var valore: CaptureError?
+
+        func imposta(_ nuovo: CaptureError?) {
+            lock.lock()
+            valore = nuovo
+            lock.unlock()
+        }
+
+        func leggi() -> CaptureError? {
+            lock.lock()
+            defer { lock.unlock() }
+            return valore
+        }
+    }
+
     @discardableResult
     private func startSystemAudio() -> CaptureError? {
         let gate = DispatchSemaphore(value: 0)
-        var result: CaptureError?
+        let esito = Esito()
 
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(
                     false, onScreenWindowsOnly: false)
                 guard let display = content.displays.first else {
-                    result = .screenDenied
+                    esito.imposta(.screenDenied)
                     gate.signal()
                     return
                 }
@@ -334,13 +354,13 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
                 try await stream.startCapture()
                 self.stream = stream
             } catch {
-                result = .screenDenied
+                esito.imposta(.screenDenied)
             }
             gate.signal()
         }
 
         _ = gate.wait(timeout: .now() + 70)
-        return result
+        return esito.leggi()
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of type: SCStreamOutputType) {
@@ -395,7 +415,7 @@ private final class Capture: NSObject, SCStreamOutput, SCStreamDelegate {
 }
 
 private let stateLock = NSLock()
-private var active: AnyObject?
+nonisolated(unsafe) private var active: AnyObject?
 
 @_cdecl("brief_capture_start")
 public func brief_capture_start(

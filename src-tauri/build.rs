@@ -29,6 +29,11 @@ fn build_swift_capture() {
             "-parse-as-library",
             "-module-name",
             "BriefCapture",
+            // La versione del linguaggio va fissata: i compilatori più
+            // recenti applicano regole di concorrenza più severe e la
+            // compilazione fallirebbe solo su alcune macchine.
+            "-swift-version",
+            "5",
             "-target",
             "arm64-apple-macos13.0",
             optimization,
