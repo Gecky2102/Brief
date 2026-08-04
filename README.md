@@ -47,7 +47,12 @@ Scaricati al primo uso e verificati contro l'hash SHA-256 pubblicato. I download
 
 ## Requisiti
 
-macOS 13+ su Apple Silicon. Al primo avvio l'app chiede **microfono** e **registrazione schermo** — quest'ultimo è il permesso che macOS richiede per catturare l'audio di sistema. Dopo averlo concesso l'app va riavviata: lo impone il sistema.
+**macOS 13+ su Apple Silicon.** Su Mac Intel non è disponibile: il motore di
+riconoscimento voci non fornisce più binari per quell'architettura.
+
+**Windows 10+** è supportato per registrazione, importazione, trascrizione e
+report. La trascrizione gira su processore anziché su GPU, quindi è più lenta
+che su Mac. Al primo avvio l'app chiede **microfono** e **registrazione schermo** — quest'ultimo è il permesso che macOS richiede per catturare l'audio di sistema. Dopo averlo concesso l'app va riavviata: lo impone il sistema.
 
 ## Sviluppo
 

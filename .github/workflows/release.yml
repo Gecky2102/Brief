@@ -17,8 +17,6 @@ jobs:
         include:
           - platform: macos-14
             args: "--target aarch64-apple-darwin"
-          - platform: macos-14
-            args: "--target x86_64-apple-darwin"
           - platform: windows-latest
             args: ""
 
@@ -34,7 +32,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:
