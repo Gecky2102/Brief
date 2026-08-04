@@ -56,6 +56,19 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4QzIwQUU0OTU1NjdBM0IKUldRN2VsYVY1QXJDbU5tblpwQ3RkbWxNNHBPNkpSOHpwQnJNem5La0F5b3NyYTF0eUFDQkUwY1oK",
+      "endpoints": [
+        "https://github.com/Gecky2102/Brief/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

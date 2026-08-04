@@ -7,6 +7,8 @@
     "core:default",
     "sql:allow-load",
     "sql:allow-select",
-    "sql:allow-execute"
+    "sql:allow-execute",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

@@ -3,6 +3,7 @@ import Recorder from "./components/Recorder";
 import SessionView from "./components/SessionView";
 import SettingsPanel from "./components/SettingsPanel";
 import Shortcuts from "./components/Shortcuts";
+import UpdateBanner from "./components/UpdateBanner";
 import Spinner from "./components/Spinner";
 import {
   deleteSession,
@@ -320,6 +321,7 @@ export default function App() {
     <div className="flex h-full">
       <div className="brief-titlebar" />
       <aside className="flex w-64 shrink-0 flex-col border-r border-edge">
+        <UpdateBanner />
         <header className="space-y-2.5 px-3 pb-2.5 pt-11">
           <div className="flex items-center justify-between">
             <h1 className="text-[13px] font-semibold tracking-tight">Brief</h1>
