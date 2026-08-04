@@ -19,6 +19,12 @@ fn build_swift_capture() {
     println!("cargo:rerun-if-changed={}", source.display());
     println!("cargo:rerun-if-changed={}", pdf_source.display());
 
+    // L'architettura deve seguire quella richiesta a cargo: compilare sempre
+    // per ARM fa fallire il collegamento sulle build Intel.
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_else(|_| "aarch64".into());
+    let swift_arch = if arch == "x86_64" { "x86_64" } else { "arm64" };
+    let swift_target = format!("{swift_arch}-apple-macos13.0");
+
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".into());
     let optimization = if profile == "release" { "-O" } else { "-Onone" };
 
@@ -35,7 +41,7 @@ fn build_swift_capture() {
             "-swift-version",
             "5",
             "-target",
-            "arm64-apple-macos13.0",
+            &swift_target,
             optimization,
         ])
         .arg("-o")
