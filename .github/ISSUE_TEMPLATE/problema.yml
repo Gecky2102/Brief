@@ -1,0 +1,49 @@
+name: Segnala un problema
+description: Qualcosa non funziona come dovrebbe
+labels: ["problema"]
+body:
+  - type: textarea
+    id: cosa
+    attributes:
+      label: Cosa succede
+      description: Descrivi il problema e cosa ti aspettavi invece.
+    validations:
+      required: true
+
+  - type: textarea
+    id: passi
+    attributes:
+      label: Come riprodurlo
+      placeholder: |
+        1. Apro una sessione
+        2. Premo…
+        3. Compare…
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema operativo
+      options:
+        - macOS
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: versione
+    attributes:
+      label: Versione di Brief
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: altro
+    attributes:
+      label: Altro
+      description: |
+        Se riguarda la trascrizione, indica quale modello usi e la lingua.
+        Se riguarda i documenti, quale servizio e quale modello hai configurato.
+        Non incollare mai la tua chiave API.

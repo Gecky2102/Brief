@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-label="Brief">
+  <defs>
+    <linearGradient id="sfondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#16161a"/>
+      <stop offset="100%" stop-color="#0e0e12"/>
+    </linearGradient>
+    <linearGradient id="onda" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0a84ff"/>
+      <stop offset="50%" stop-color="#30d158"/>
+      <stop offset="100%" stop-color="#ff9f0a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="400" fill="url(#sfondo)"/>
+
+  <!-- Le barre richiamano l'icona dell'app: tre voci distinte che parlano. -->
+  <g transform="translate(150 200)">
+    <rect x="-16" y="-52" width="26" height="104" rx="13" fill="#0a84ff"/>
+    <rect x="30" y="-84" width="26" height="168" rx="13" fill="#30d158"/>
+    <rect x="76" y="-116" width="26" height="232" rx="13" fill="#ff9f0a"/>
+    <rect x="122" y="-70" width="26" height="140" rx="13" fill="#0a84ff" opacity="0.55"/>
+    <rect x="168" y="-40" width="26" height="80" rx="13" fill="#30d158" opacity="0.4"/>
+  </g>
+
+  <text x="400" y="176" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Helvetica, sans-serif"
+        font-size="104" font-weight="600" fill="#f5f5f7" letter-spacing="-3">Brief</text>
+
+  <text x="404" y="232" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', Helvetica, sans-serif"
+        font-size="30" fill="#a1a1a8" letter-spacing="-0.4">Dalle riunioni ai documenti, senza che l'audio esca dal computer.</text>
+
+  <g transform="translate(404 268)" font-family="-apple-system, 'SF Pro Text', Helvetica, sans-serif" font-size="19" fill="#6e6e78">
+    <text x="0" y="0">Trascrizione locale</text>
+    <text x="190" y="0">·</text>
+    <text x="214" y="0">Riconoscimento delle voci</text>
+    <text x="470" y="0">·</text>
+    <text x="494" y="0">Documenti impaginati</text>
+  </g>
+
+  <rect y="396" width="1280" height="4" fill="url(#onda)"/>
+</svg>
