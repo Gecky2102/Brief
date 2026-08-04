@@ -1,4 +1,6 @@
-use std::os::raw::{c_char, c_float};
+#[cfg(target_os = "macos")]
+use std::os::raw::c_char;
+use std::os::raw::c_float;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -38,6 +40,7 @@ extern "C" {
 /// Le due piattaforme catturano l'audio in modo completamente diverso: macOS
 /// con ScreenCaptureKit dal codice Swift, Windows con WASAPI in loopback.
 mod backend {
+    #[allow(unused_imports)]
     use super::{LevelCallback, SamplesCallback};
 
     #[cfg(target_os = "macos")]

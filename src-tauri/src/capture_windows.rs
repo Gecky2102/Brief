@@ -124,7 +124,7 @@ fn start_microphone(
     ));
 
     let canali = config.channels();
-    let rate = config.sample_rate().0;
+    let rate = config.sample_rate();
     let mut stato = TrackState {
         track: TRACK_MIC,
         writer: writer.clone(),
@@ -137,7 +137,7 @@ fn start_microphone(
 
     let stream = device
         .build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[f32], _| {
                 stato.push(&to_mono_16k(dati, canali, rate));
             },
@@ -171,7 +171,7 @@ fn start_system_loopback(
     ));
 
     let canali = config.channels();
-    let rate = config.sample_rate().0;
+    let rate = config.sample_rate();
     let mut stato = TrackState {
         track: TRACK_SYSTEM,
         writer: writer.clone(),
@@ -184,7 +184,7 @@ fn start_system_loopback(
 
     let stream = device
         .build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[f32], _| {
                 SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
                 stato.push(&to_mono_16k(dati, canali, rate));

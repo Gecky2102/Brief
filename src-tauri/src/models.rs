@@ -295,6 +295,7 @@ pub fn storage_report(app: AppHandle) -> Result<StorageReport, String> {
     })
 }
 
+#[cfg(unix)]
 fn free_space(path: &std::path::Path) -> Option<u64> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
@@ -305,6 +306,31 @@ fn free_space(path: &std::path::Path) -> Option<u64> {
         return None;
     }
     Some(stats.f_bavail as u64 * stats.f_frsize as u64)
+}
+
+/// Su Windows lo spazio libero si chiede al sistema con `wmic`: evita di
+/// aggiungere una dipendenza sulle API native solo per un numero.
+#[cfg(windows)]
+fn free_space(path: &std::path::Path) -> Option<u64> {
+    let unita = path.components().next().map(|c| {
+        c.as_os_str().to_string_lossy().trim_end_matches('\\').to_string()
+    })?;
+
+    let uscita = std::process::Command::new("cmd")
+        .args(["/C", &format!("dir /-C \"{unita}\\\"")])
+        .output()
+        .ok()?;
+
+    let testo = String::from_utf8_lossy(&uscita.stdout);
+    // L'ultima riga con molte cifre contiene i byte disponibili.
+    testo
+        .lines()
+        .rev()
+        .find_map(|riga| {
+            riga.split_whitespace()
+                .filter_map(|parola| parola.replace('.', "").replace(',', "").parse::<u64>().ok())
+                .find(|valore| *valore > 1_000_000)
+        })
 }
 
 /// Ricontrolla l'hash di un modello già presente: un file corrotto da un

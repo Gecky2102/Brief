@@ -25,7 +25,6 @@ tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 ureq = { version = "3.3.0", features = ["json"] }
 sha2 = "0.11.0"
 tauri-plugin-dialog = "2.7.2"
-libc = "0.2.189"
 rustfft = "6.4.1"
 tokenizers = { version = "0.23.1", default-features = false, features = ["onig"] }
 tauri-plugin-updater = "2.10.1"
@@ -38,6 +37,9 @@ ort = { version = "2.0.0-rc.13", features = ["coreml"] }
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = "0.16.0"
 ort = "2.0.0-rc.13"
+
+[target."cfg(unix)".dependencies]
+libc = "0.2.189"
 
 [target."cfg(windows)".dependencies]
 cpal = "0.18.1"
