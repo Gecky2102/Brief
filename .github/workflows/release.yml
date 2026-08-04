@@ -19,6 +19,8 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: macos-14
             args: "--target x86_64-apple-darwin"
+          - platform: windows-latest
+            args: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -32,14 +34,16 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
 
-      # whisper.cpp si compila con cmake, che non è preinstallato ovunque.
+      # whisper.cpp si compila con cmake, presente sui runner Windows ma non
+      # sempre su quelli macOS.
       - name: Installa cmake
+        if: startsWith(matrix.platform, 'macos')
         run: brew install cmake || true
 
       - name: Installa le dipendenze

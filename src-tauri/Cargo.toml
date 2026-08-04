@@ -33,3 +33,7 @@ tokenizers = { version = "0.23.1", default-features = false, features = ["onig"]
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 
+[target."cfg(windows)".dependencies]
+cpal = "0.18.1"
+wasapi = "0.23.0"
+

@@ -1,4 +1,6 @@
+#[cfg(target_os = "macos")]
 use std::path::PathBuf;
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 /// La cattura audio è scritta in Swift (ScreenCaptureKit e AVFoundation non
@@ -6,6 +8,7 @@ use std::process::Command;
 /// Sta nello stesso processo di proposito: i permessi macOS sono legati al
 /// processo che li richiede, e un binario separato firmato ad-hoc finirebbe per
 /// chiederli per conto proprio.
+#[cfg(target_os = "macos")]
 fn build_swift_capture() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let source = manifest.join("swift/BriefCapture.swift");
@@ -61,6 +64,10 @@ fn build_swift_capture() {
 }
 
 fn main() {
+    // Il codice Swift esiste solo per macOS: su Windows la cattura la fa
+    // WASAPI dal codice Rust.
+    #[cfg(target_os = "macos")]
     build_swift_capture();
+
     tauri_build::build()
 }

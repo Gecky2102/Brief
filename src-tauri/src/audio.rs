@@ -1,4 +1,3 @@
-use std::ffi::CString;
 use std::os::raw::{c_char, c_float};
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
@@ -8,10 +7,22 @@ use serde::Serialize;
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager};
 
-type LevelCallback = extern "C" fn(track: i32, rms: c_float, elapsed_ms: i64);
-type SamplesCallback =
+pub type LevelCallback = extern "C" fn(track: i32, rms: c_float, elapsed_ms: i64);
+pub type SamplesCallback =
     extern "C" fn(track: i32, samples: *const i16, count: std::os::raw::c_int, start_ms: i64);
 
+/// Guadagno per traccia, condiviso fra le due implementazioni di cattura.
+static GAIN: [std::sync::atomic::AtomicU32; 2] = [
+    std::sync::atomic::AtomicU32::new(1_000),
+    std::sync::atomic::AtomicU32::new(1_000),
+];
+
+pub fn current_gain(track: i32) -> f32 {
+    let indice = track.clamp(0, 1) as usize;
+    GAIN[indice].load(std::sync::atomic::Ordering::Relaxed) as f32 / 1000.0
+}
+
+#[cfg(target_os = "macos")]
 extern "C" {
     fn brief_capture_start(
         directory: *const c_char,
@@ -22,6 +33,53 @@ extern "C" {
     fn brief_capture_is_running() -> i32;
     fn brief_capture_system_health() -> i64;
     fn brief_set_gain(track: i32, value: f32);
+}
+
+/// Le due piattaforme catturano l'audio in modo completamente diverso: macOS
+/// con ScreenCaptureKit dal codice Swift, Windows con WASAPI in loopback.
+mod backend {
+    use super::{LevelCallback, SamplesCallback};
+
+    #[cfg(target_os = "macos")]
+    pub fn start(
+        directory: &std::path::Path,
+        level: LevelCallback,
+        samples: SamplesCallback,
+    ) -> i32 {
+        let Ok(path) = std::ffi::CString::new(directory.to_string_lossy().as_bytes())
+        else {
+            return 6;
+        };
+        unsafe { super::brief_capture_start(path.as_ptr(), level, samples) }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn stop() -> i64 {
+        unsafe { super::brief_capture_stop() }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn is_running() -> bool {
+        unsafe { super::brief_capture_is_running() == 1 }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn system_health() -> i64 {
+        unsafe { super::brief_capture_system_health() }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn set_gain(track: i32, value: f32) {
+        unsafe { super::brief_set_gain(track, value) }
+    }
+
+    #[cfg(windows)]
+    pub use crate::capture_windows::{is_running, start, stop, system_health};
+
+    #[cfg(windows)]
+    pub fn set_gain(_track: i32, _value: f32) {
+        // Su Windows il guadagno lo legge direttamente la cattura da GAIN.
+    }
 }
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -141,14 +199,11 @@ fn start_blocking(app: AppHandle, session_id: i64) -> Result<StartedRecording, S
     std::fs::create_dir_all(&directory)
         .map_err(|cause| format!("Impossibile creare la cartella della sessione: {cause}"))?;
 
-    let path = CString::new(directory.to_string_lossy().as_bytes())
-        .map_err(|_| "Percorso della sessione non valido.".to_string())?;
-
     // Il trascrittore parte per primo: se il modello manca o non si carica è
     // meglio saperlo prima di aver registrato qualcosa.
     crate::transcriber::start(&app, session_id)?;
 
-    let code = unsafe { brief_capture_start(path.as_ptr(), on_level, crate::transcriber::on_samples) };
+    let code = backend::start(&directory, on_level, crate::transcriber::on_samples);
     if code != 0 {
         crate::transcriber::stop();
         let _ = std::fs::remove_dir_all(&directory);
@@ -172,7 +227,7 @@ pub async fn stop_recording() -> Result<FinishedRecording, String> {
 }
 
 fn stop_blocking() -> Result<FinishedRecording, String> {
-    let duration_ms = unsafe { brief_capture_stop() };
+    let duration_ms = backend::stop();
     hide_recording_indicator();
     crate::transcriber::stop();
     if duration_ms < 0 {
@@ -197,7 +252,7 @@ fn stop_blocking() -> Result<FinishedRecording, String> {
 /// altrimenti il numero di campioni ricevuti finora.
 #[tauri::command]
 pub fn system_track_health() -> i64 {
-    unsafe { brief_capture_system_health() }
+    backend::system_health()
 }
 
 /// Guadagno di una traccia, come un cursore di mixer: 1 lascia il livello
@@ -209,10 +264,15 @@ pub fn set_track_gain(track: String, value: f32) {
         "system" => 1,
         _ => return,
     };
-    unsafe { brief_set_gain(indice, value) };
+    let limitato = value.clamp(0.0, 4.0);
+    GAIN[indice.clamp(0, 1) as usize].store(
+        (limitato * 1000.0) as u32,
+        std::sync::atomic::Ordering::Relaxed,
+    );
+    backend::set_gain(indice, limitato);
 }
 
 #[tauri::command]
 pub fn is_recording() -> bool {
-    unsafe { brief_capture_is_running() == 1 }
+    backend::is_running()
 }
