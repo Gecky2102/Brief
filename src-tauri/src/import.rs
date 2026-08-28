@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 use serde::Serialize;
@@ -144,6 +145,7 @@ fn to_whisper_wav(
     Err("Formato audio non supportato.".into())
 }
 
+#[cfg(target_os = "macos")]
 fn read_samples(path: &std::path::Path) -> Result<Vec<f32>, String> {
     let bytes = std::fs::read(path).map_err(|cause| format!("Audio illeggibile: {cause}"))?;
     if bytes.len() <= 44 {
