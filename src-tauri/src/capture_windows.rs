@@ -124,7 +124,7 @@ fn start_microphone(
     ));
 
     let canali = config.channels();
-    let rate = config.sample_rate().0;
+    let rate = config.sample_rate();
     let format = config.sample_format();
     let mut stato = TrackState {
         track: TRACK_MIC,
@@ -138,7 +138,7 @@ fn start_microphone(
 
     let stream = match format {
         cpal::SampleFormat::F32 => device.build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[f32], _| {
                 stato.push(&to_mono_16k(dati, canali, rate));
             },
@@ -146,7 +146,7 @@ fn start_microphone(
             None,
         ),
         cpal::SampleFormat::I16 => device.build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[i16], _| {
                 let f32_data: Vec<f32> = dati.iter().map(|&s| s as f32 / 32768.0).collect();
                 stato.push(&to_mono_16k(&f32_data, canali, rate));
@@ -155,7 +155,7 @@ fn start_microphone(
             None,
         ),
         cpal::SampleFormat::U16 => device.build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[u16], _| {
                 let f32_data: Vec<f32> =
                     dati.iter().map(|&s| (s as f32 - 32768.0) / 32768.0).collect();
@@ -195,7 +195,7 @@ fn start_system_loopback(
     ));
 
     let canali = config.channels();
-    let rate = config.sample_rate().0;
+    let rate = config.sample_rate();
     let format = config.sample_format();
     let mut stato = TrackState {
         track: TRACK_SYSTEM,
@@ -209,7 +209,7 @@ fn start_system_loopback(
 
     let stream = match format {
         cpal::SampleFormat::F32 => device.build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[f32], _| {
                 SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
                 stato.push(&to_mono_16k(dati, canali, rate));
@@ -218,7 +218,7 @@ fn start_system_loopback(
             None,
         ),
         cpal::SampleFormat::I16 => device.build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[i16], _| {
                 SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
                 let f32_data: Vec<f32> = dati.iter().map(|&s| s as f32 / 32768.0).collect();
@@ -228,7 +228,7 @@ fn start_system_loopback(
             None,
         ),
         cpal::SampleFormat::U16 => device.build_input_stream(
-            &config.into(),
+            config.into(),
             move |dati: &[u16], _| {
                 SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
                 let f32_data: Vec<f32> =
