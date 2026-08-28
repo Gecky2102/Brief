@@ -55,7 +55,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Brief ${{ github.ref_name }}"
-          releaseBody: "Trascina Brief nella cartella Applicazioni. Gli aggiornamenti successivi arrivano dall'app stessa."
+          releaseBody: "Brief per macOS (Apple Silicon .dmg) e Windows (installer .exe / .msi). Gli aggiornamenti successivi arrivano direttamente dall'applicazione."
           releaseDraft: false
           # Una piattaforma che fallisce non deve impedire la pubblicazione
           # delle altre.

@@ -19,6 +19,7 @@ static GAIN: [std::sync::atomic::AtomicU32; 2] = [
     std::sync::atomic::AtomicU32::new(1_000),
 ];
 
+#[allow(dead_code)]
 pub fn current_gain(track: i32) -> f32 {
     let indice = track.clamp(0, 1) as usize;
     GAIN[indice].load(std::sync::atomic::Ordering::Relaxed) as f32 / 1000.0

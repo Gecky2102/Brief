@@ -49,7 +49,7 @@ export default function Welcome({ settings, onDone }: Props) {
           Un passaggio e sei operativo
         </h2>
         <p className="text-xs leading-relaxed text-ink-muted">
-          Registrazione e trascrizione funzionano già, e restano sul tuo Mac.
+          Registrazione e trascrizione funzionano già, e restano sul tuo computer.
           Per i report serve un servizio di intelligenza artificiale: scegli
           quale e incolla la sua chiave.
         </p>
@@ -97,7 +97,7 @@ export default function Welcome({ settings, onDone }: Props) {
       </div>
 
       <p className="text-[11px] leading-relaxed text-ink-muted">
-        La chiave resta sul tuo Mac, in un file leggibile solo dal tuo utente.
+        La chiave resta sul tuo computer, in un file leggibile solo dal tuo utente.
         Al servizio scelto viene inviato il testo della trascrizione, mai
         l'audio.
       </p>

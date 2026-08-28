@@ -308,29 +308,37 @@ fn free_space(path: &std::path::Path) -> Option<u64> {
     Some(stats.f_bavail as u64 * stats.f_frsize as u64)
 }
 
-/// Su Windows lo spazio libero si chiede al sistema con `wmic`: evita di
-/// aggiungere una dipendenza sulle API native solo per un numero.
+/// Su Windows lo spazio libero si chiede direttamente alle API Win32 senza spawnare processi.
 #[cfg(windows)]
 fn free_space(path: &std::path::Path) -> Option<u64> {
-    let unita = path.components().next().map(|c| {
-        c.as_os_str().to_string_lossy().trim_end_matches('\\').to_string()
-    })?;
+    use std::os::windows::ffi::OsStrExt;
+    let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+    wide.push(0);
 
-    let uscita = std::process::Command::new("cmd")
-        .args(["/C", &format!("dir /-C \"{unita}\\\"")])
-        .output()
-        .ok()?;
+    extern "system" {
+        fn GetDiskFreeSpaceExW(
+            lpDirectoryName: *const u16,
+            lpFreeBytesAvailableToCaller: *mut u64,
+            lpTotalNumberOfBytes: *mut u64,
+            lpTotalNumberOfFreeBytes: *mut u64,
+        ) -> i32;
+    }
 
-    let testo = String::from_utf8_lossy(&uscita.stdout);
-    // L'ultima riga con molte cifre contiene i byte disponibili.
-    testo
-        .lines()
-        .rev()
-        .find_map(|riga| {
-            riga.split_whitespace()
-                .filter_map(|parola| parola.replace('.', "").replace(',', "").parse::<u64>().ok())
-                .find(|valore| *valore > 1_000_000)
-        })
+    let mut free_bytes: u64 = 0;
+    let success = unsafe {
+        GetDiskFreeSpaceExW(
+            wide.as_ptr(),
+            &mut free_bytes,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+
+    if success != 0 {
+        Some(free_bytes)
+    } else {
+        None
+    }
 }
 
 /// Ricontrolla l'hash di un modello già presente: un file corrotto da un

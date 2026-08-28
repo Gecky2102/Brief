@@ -190,6 +190,7 @@ pub fn similarity(a: &[f32], b: &[f32]) -> f32 {
 /// Raggruppa le impronte per voce, unendo via via le due più simili finché
 /// restano sopra soglia. Semplice, ma su una manciata di parlanti funziona bene
 /// e non richiede di sapere in anticipo quante persone ci sono.
+#[allow(dead_code)]
 pub fn cluster(embeddings: &[Vec<f32>], soglia: f32, massimo: usize) -> Vec<usize> {
     if embeddings.is_empty() {
         return Vec::new();

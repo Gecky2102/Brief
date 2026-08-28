@@ -29,6 +29,7 @@ rustfft = "6.4.1"
 tokenizers = { version = "0.23.1", default-features = false, features = ["onig"] }
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
+symphonia = { version = "0.5.4", features = ["all"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16.0", features = ["metal"] }
@@ -43,6 +44,4 @@ libc = "0.2.189"
 
 [target."cfg(windows)".dependencies]
 cpal = "0.18.1"
-windows = "0.61"
-windows-core = "0.61"
 

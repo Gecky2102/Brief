@@ -19,7 +19,7 @@ const LEVEL_INTERVAL_MS: i64 = 50;
 
 struct Running {
     started_at: std::time::Instant,
-    writers: Vec<Arc<Mutex<super::wav::WavWriter>>>,
+    writers: Vec<Arc<Mutex<crate::wav::WavWriter>>>,
     /// I flussi vanno tenuti in vita: rilasciandoli la cattura si ferma.
     _streams: Vec<Box<dyn std::any::Any + Send>>,
 }
@@ -55,7 +55,7 @@ fn to_mono_16k(input: &[f32], channels: u16, rate: u32) -> Vec<i16> {
 
 struct TrackState {
     track: i32,
-    writer: Arc<Mutex<super::wav::WavWriter>>,
+    writer: Arc<Mutex<crate::wav::WavWriter>>,
     level: LevelCallback,
     samples: SamplesCallback,
     started_at: std::time::Instant,
@@ -114,17 +114,18 @@ fn start_microphone(
     level: LevelCallback,
     samples: SamplesCallback,
     started_at: std::time::Instant,
-) -> Result<(Box<dyn std::any::Any + Send>, Arc<Mutex<super::wav::WavWriter>>), i32> {
+) -> Result<(Box<dyn std::any::Any + Send>, Arc<Mutex<crate::wav::WavWriter>>), i32> {
     let host = cpal::default_host();
     let device = host.default_input_device().ok_or(3)?;
     let config = device.default_input_config().map_err(|_| 3)?;
 
     let writer = Arc::new(Mutex::new(
-        super::wav::WavWriter::create(&directory.join("mic.wav")).map_err(|_| 6)?,
+        crate::wav::WavWriter::create(&directory.join("mic.wav")).map_err(|_| 6)?,
     ));
 
     let canali = config.channels();
-    let rate = config.sample_rate();
+    let rate = config.sample_rate().0;
+    let format = config.sample_format();
     let mut stato = TrackState {
         track: TRACK_MIC,
         writer: writer.clone(),
@@ -135,43 +136,67 @@ fn start_microphone(
         peak: 0.0,
     };
 
-    let stream = device
-        .build_input_stream(
-            config.into(),
+    let stream = match format {
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &config.into(),
             move |dati: &[f32], _| {
                 stato.push(&to_mono_16k(dati, canali, rate));
             },
             |_| {},
             None,
-        )
-        .map_err(|_| 3)?;
+        ),
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            &config.into(),
+            move |dati: &[i16], _| {
+                let f32_data: Vec<f32> = dati.iter().map(|&s| s as f32 / 32768.0).collect();
+                stato.push(&to_mono_16k(&f32_data, canali, rate));
+            },
+            |_| {},
+            None,
+        ),
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            &config.into(),
+            move |dati: &[u16], _| {
+                let f32_data: Vec<f32> =
+                    dati.iter().map(|&s| (s as f32 - 32768.0) / 32768.0).collect();
+                stato.push(&to_mono_16k(&f32_data, canali, rate));
+            },
+            |_| {},
+            None,
+        ),
+        _ => return Err(3),
+    }
+    .map_err(|_| 3)?;
 
     stream.play().map_err(|_| 3)?;
     Ok((Box::new(stream), writer))
 }
 
-/// Audio di sistema: su Windows il dispositivo di uscita si può aprire in
-/// ingresso, ed è così che WASAPI espone ciò che sta suonando. Non tutte le
-/// schede audio lo permettono, quindi il fallimento non è un errore fatale.
+/// Audio di sistema: su Windows il dispositivo di uscita si apre in
+/// loopback WASAPI con cpal. Non tutte le schede audio o driver lo supportano,
+/// quindi il fallimento non interrompe la registrazione del microfono.
 fn start_system_loopback(
     directory: &std::path::Path,
     level: LevelCallback,
     samples: SamplesCallback,
     started_at: std::time::Instant,
-) -> Result<(Box<dyn std::any::Any + Send>, Arc<Mutex<super::wav::WavWriter>>), i32> {
+) -> Result<(Box<dyn std::any::Any + Send>, Arc<Mutex<crate::wav::WavWriter>>), i32> {
     let host = cpal::default_host();
     let device = host.default_output_device().ok_or(2)?;
 
-    // Configurazione di ingresso sul dispositivo di uscita: è la richiesta di
-    // loopback vera e propria.
-    let config = device.default_input_config().map_err(|_| 2)?;
+    // Configurazione del dispositivo di uscita: necessaria per il loopback WASAPI.
+    let config = device
+        .default_output_config()
+        .or_else(|_| device.default_input_config())
+        .map_err(|_| 2)?;
 
     let writer = Arc::new(Mutex::new(
-        super::wav::WavWriter::create(&directory.join("system.wav")).map_err(|_| 6)?,
+        crate::wav::WavWriter::create(&directory.join("system.wav")).map_err(|_| 6)?,
     ));
 
     let canali = config.channels();
-    let rate = config.sample_rate();
+    let rate = config.sample_rate().0;
+    let format = config.sample_format();
     let mut stato = TrackState {
         track: TRACK_SYSTEM,
         writer: writer.clone(),
@@ -182,17 +207,40 @@ fn start_system_loopback(
         peak: 0.0,
     };
 
-    let stream = device
-        .build_input_stream(
-            config.into(),
+    let stream = match format {
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &config.into(),
             move |dati: &[f32], _| {
                 SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
                 stato.push(&to_mono_16k(dati, canali, rate));
             },
             |_| {},
             None,
-        )
-        .map_err(|_| 2)?;
+        ),
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            &config.into(),
+            move |dati: &[i16], _| {
+                SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
+                let f32_data: Vec<f32> = dati.iter().map(|&s| s as f32 / 32768.0).collect();
+                stato.push(&to_mono_16k(&f32_data, canali, rate));
+            },
+            |_| {},
+            None,
+        ),
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            &config.into(),
+            move |dati: &[u16], _| {
+                SYSTEM_SAMPLES.fetch_add(dati.len() as i64, Ordering::Relaxed);
+                let f32_data: Vec<f32> =
+                    dati.iter().map(|&s| (s as f32 - 32768.0) / 32768.0).collect();
+                stato.push(&to_mono_16k(&f32_data, canali, rate));
+            },
+            |_| {},
+            None,
+        ),
+        _ => return Err(2),
+    }
+    .map_err(|_| 2)?;
 
     stream.play().map_err(|_| 2)?;
     SYSTEM_STARTED.store(true, Ordering::Relaxed);

@@ -2,19 +2,23 @@ type Props = {
   onClose: () => void;
 };
 
-const SCORCIATOIE: [string, string][] = [
-  ["Spazio", "Avvia o ferma la registrazione"],
-  ["⌘N", "Nuova sessione"],
-  ["⌘F", "Cerca nelle trascrizioni"],
-  ["⌘R", "Genera o rigenera il report"],
-  ["⌘P", "Esporta il report in PDF"],
-  ["⌘⇧C", "Copia la sessione negli appunti"],
-  ["⌘,", "Impostazioni"],
-  ["Esc", "Svuota la ricerca o torna indietro"],
-  ["?", "Mostra questo riquadro"],
-];
-
 export default function Shortcuts({ onClose }: Props) {
+  const isMac =
+    typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+  const mod = isMac ? "⌘" : "Ctrl+";
+  const shiftMod = isMac ? "⌘⇧" : "Ctrl+Shift+";
+
+  const scorciatoie: [string, string][] = [
+    ["Spazio", "Avvia o ferma la registrazione"],
+    [`${mod}N`, "Nuova sessione"],
+    [`${mod}F`, "Cerca nelle trascrizioni"],
+    [`${mod}R`, "Genera o rigenera il report"],
+    [`${mod}P`, "Esporta il report in PDF (o stampa)"],
+    [`${shiftMod}C`, "Copia la sessione negli appunti"],
+    [`${mod},`, "Impostazioni"],
+    ["Esc", "Svuota la ricerca o torna indietro"],
+    ["?", "Mostra questo riquadro"],
+  ];
   return (
     <div
       onClick={onClose}
@@ -35,7 +39,7 @@ export default function Shortcuts({ onClose }: Props) {
         </div>
 
         <dl className="space-y-1.5">
-          {SCORCIATOIE.map(([tasto, azione]) => (
+          {scorciatoie.map(([tasto, azione]) => (
             <div key={tasto} className="flex items-baseline gap-3">
               <dt className="w-16 shrink-0 text-right font-mono text-[11px] text-ink-muted">
                 {tasto}

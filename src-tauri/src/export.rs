@@ -1,18 +1,22 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(target_os = "macos")]
 use std::ffi::CString;
+#[cfg(target_os = "macos")]
 use std::os::raw::c_char;
 
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
+#[cfg(target_os = "macos")]
 extern "C" {
     fn brief_html_to_pdf(html: *const c_char, output: *const c_char) -> i32;
 }
 
 /// `afconvert` fa parte di macOS: comprimere in AAC riduce un'ora di parlato da
 /// ~110 MB di WAV a ~28 MB, e i WAV a 16 kHz servivano solo alla trascrizione.
+#[cfg(target_os = "macos")]
 fn to_aac(source: &Path, destination: &Path) -> Result<(), String> {
     let status = Command::new("/usr/bin/afconvert")
         .arg("-f")
@@ -63,16 +67,23 @@ pub async fn compress_recording(app: AppHandle, directory: String) -> Result<(),
 }
 
 fn compress_blocking(app: AppHandle, directory: String) -> Result<(), String> {
-    let directory = session_directory(&app, &directory)?;
+    #[cfg(target_os = "macos")]
+    {
+        let directory = session_directory(&app, &directory)?;
 
-    for track in ["mic", "system"] {
-        let wav = directory.join(format!("{track}.wav"));
-        if !wav.exists() {
-            continue;
+        for track in ["mic", "system"] {
+            let wav = directory.join(format!("{track}.wav"));
+            if !wav.exists() {
+                continue;
+            }
+            let m4a = directory.join(format!("{track}.m4a"));
+            to_aac(&wav, &m4a)?;
+            let _ = std::fs::remove_file(&wav);
         }
-        let m4a = directory.join(format!("{track}.m4a"));
-        to_aac(&wav, &m4a)?;
-        let _ = std::fs::remove_file(&wav);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, directory);
     }
     Ok(())
 }
@@ -150,7 +161,8 @@ fn export_markdown_blocking(
 }
 
 /// Salva il documento come PDF. L'HTML arriva già impaginato dall'interfaccia
-/// e viene reso da WebKit, che rispetta tabelle e interruzioni di pagina.
+/// e viene reso da WebKit su macOS, che rispetta tabelle e interruzioni di pagina.
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub async fn export_pdf(
     app: AppHandle,
@@ -202,6 +214,16 @@ pub async fn export_pdf(
         5 => Err("Richiesto macOS 11 o successivo.".into()),
         _ => Err("Creazione del PDF non riuscita.".into()),
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub async fn export_pdf(
+    _app: AppHandle,
+    _file_name: String,
+    _html: String,
+) -> Result<bool, String> {
+    Err("L'esportazione diretta in PDF è al momento disponibile su macOS. Su Windows puoi esportare in Markdown o copiare il testo negli appunti.".into())
 }
 
 #[tauri::command]
@@ -263,8 +285,8 @@ pub fn audio_file(app: AppHandle, directory: String) -> Result<Option<String>, S
     Ok(None)
 }
 
-/// Apre nel Finder la cartella dove Brief tiene database, registrazioni e
-/// modelli: utile per capire cosa occupa spazio o fare una copia.
+/// Apre nel gestore file (Finder/Explorer) la cartella dove Brief tiene database,
+/// registrazioni e modelli.
 #[tauri::command]
 pub fn reveal_data_folder(app: AppHandle) -> Result<(), String> {
     use tauri::Manager;
@@ -275,10 +297,24 @@ pub fn reveal_data_folder(app: AppHandle) -> Result<(), String> {
         .map_err(|cause| format!("Cartella dati non disponibile: {cause}"))?;
     std::fs::create_dir_all(&dir).ok();
 
+    #[cfg(target_os = "macos")]
     Command::new("/usr/bin/open")
         .arg(&dir)
         .status()
         .map_err(|cause| format!("Impossibile aprire la cartella: {cause}"))?;
+
+    #[cfg(target_os = "windows")]
+    Command::new("explorer")
+        .arg(&dir)
+        .status()
+        .map_err(|cause| format!("Impossibile aprire la cartella: {cause}"))?;
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    Command::new("xdg-open")
+        .arg(&dir)
+        .status()
+        .map_err(|cause| format!("Impossibile aprire la cartella: {cause}"))?;
+
     Ok(())
 }
 

@@ -168,10 +168,11 @@ export default function SessionView({
       .catch(() => undefined);
   }, [segments]);
 
-  // ⌘R rigenera, ⌘P stampa, ⌘⇧C copia: le tre azioni che si ripetono di più.
+  // ⌘R / Ctrl+R rigenera, ⌘P / Ctrl+P stampa, ⌘⇧C / Ctrl+Shift+C copia.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (!event.metaKey) return;
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+      if (!isCmdOrCtrl) return;
       if (event.key === "r") {
         event.preventDefault();
         if (!analyzing && segments.length > 0) void runAnalysis();
@@ -322,8 +323,14 @@ export default function SessionView({
     if (!analysis?.report) return;
     setError(null);
     try {
-      // Il PDF viene reso da WebKit lato Rust: le webview di Tauri non
-      // supportano la stampa del browser.
+      const isMac =
+        typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+      if (!isMac) {
+        window.print();
+        return;
+      }
+      // Il PDF viene reso da WebKit lato Rust su macOS: le webview di Tauri non
+      // supportano la stampa headless del browser.
       const html = toPrintableHtml({ ...session, title }, analysis, (md) =>
         marked.parse(md, { async: false }) as string,
       );
@@ -372,6 +379,10 @@ export default function SessionView({
       setError(String(cause));
     }
   }
+
+  const isMac =
+    typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+  const mod = isMac ? "⌘" : "Ctrl+";
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -429,9 +440,9 @@ export default function SessionView({
             {analyzing ? (
               <Spinner label="Scrittura in corso…" />
             ) : analysis ? (
-              "Rigenera report ⌘R"
+              `Rigenera report ${mod}R`
             ) : (
-              "Genera report ⌘R"
+              `Genera report ${mod}R`
             )}
           </button>
           <button
@@ -445,7 +456,7 @@ export default function SessionView({
             disabled={!analysis?.report}
             className="brief-button px-3 py-1.5 text-xs disabled:opacity-40"
           >
-            Esporta PDF ⌘P
+            {isMac ? "Esporta PDF ⌘P" : "Stampa / PDF Ctrl+P"}
           </button>
           <button
             onClick={copyToClipboard}

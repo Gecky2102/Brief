@@ -113,7 +113,7 @@ export default function SettingsPanel({ onClose }: Props) {
       await setApiKey(keyDraft);
       setKeyDraft("");
       setKeyPresent(await hasApiKey());
-      setNotice("Chiave salvata nel portachiavi di sistema.");
+      setNotice("Chiave API salvata con successo.");
     } catch (cause: unknown) {
       setError(String(cause));
     }
@@ -189,7 +189,7 @@ export default function SettingsPanel({ onClose }: Props) {
           <div>
             <h3 className="text-sm font-medium">Trascrizione</h3>
             <p className="text-xs text-ink-muted">
-              Avviene sul tuo Mac. L'audio non esce mai dal computer.
+              Avviene sul tuo computer. L'audio non esce mai dal tuo dispositivo.
             </p>
           </div>
           <div className="space-y-1.5">
@@ -337,7 +337,7 @@ export default function SettingsPanel({ onClose }: Props) {
             <h3 className="text-sm font-medium">Riassunto</h3>
             <p className="text-xs leading-relaxed text-ink-muted">
               Il testo della trascrizione viene inviato al servizio scelto. Questa
-              è l'unica parte di Brief che esce dal tuo Mac.
+              è l'unica parte di Brief che esce dal tuo computer.
             </p>
           </div>
 

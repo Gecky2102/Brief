@@ -58,3 +58,28 @@ fn header(data_bytes: u32) -> Vec<u8> {
     intestazione.extend_from_slice(&data_bytes.to_le_bytes());
     intestazione
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn crea_e_scrive_wav_16k_mono() {
+        let temp = std::env::temp_dir().join(format!("brief_test_{}.wav", std::process::id()));
+        let mut writer = WavWriter::create(&temp).expect("creazione file");
+        let samples: Vec<i16> = vec![0, 1000, -1000, 2000, -2000];
+        writer.write(&samples).expect("scrittura campioni");
+        writer.close();
+
+        let bytes = std::fs::read(&temp).expect("lettura file");
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(&bytes[12..16], b"fmt ");
+        assert_eq!(bytes.len(), 44 + samples.len() * 2);
+
+        let data_size = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]);
+        assert_eq!(data_size as usize, samples.len() * 2);
+
+        let _ = std::fs::remove_file(&temp);
+    }
+}

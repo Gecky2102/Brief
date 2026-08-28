@@ -152,13 +152,17 @@ export default function Recorder({ onFinished, onStarted }: Props) {
     if (!recording) return;
     const timer = window.setInterval(async () => {
       const health = await systemTrackHealth().catch(() => 1);
+      const isMac =
+        typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
       if (health < 0) {
         setSystemWarning(
-          "L'audio di sistema non è attivo: manca il permesso di registrazione schermo. Concedilo in Impostazioni di Sistema › Privacy e sicurezza › Registrazione schermo, poi riavvia Brief. Il microfono viene registrato comunque.",
+          isMac
+            ? "L'audio di sistema non è attivo: manca il permesso di registrazione schermo. Concedilo in Impostazioni di Sistema › Privacy e sicurezza › Registrazione schermo, poi riavvia Brief. Il microfono viene registrato comunque."
+            : "L'audio di sistema non è attivo o il dispositivo di riproduzione non supporta il loopback. Il microfono viene registrato comunque.",
         );
       } else if (health === 0 && elapsedMs > 20000) {
         setSystemWarning(
-          "Nessun audio di sistema rilevato finora. Se stai registrando una call, controlla che l'audio esca dagli altoparlanti o dalle cuffie del Mac.",
+          "Nessun audio di sistema rilevato finora. Se stai registrando una conversazione, controlla che l'audio esca dagli altoparlanti o dalle cuffie.",
         );
       } else if (health > 0) {
         setSystemWarning(null);

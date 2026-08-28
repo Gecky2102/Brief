@@ -238,22 +238,23 @@ export default function App() {
 
   const searchInput = useRef<HTMLInputElement | null>(null);
 
-  // ⌘F porta alla ricerca, Esc la svuota o torna al registratore.
+  // ⌘F / Ctrl+F porta alla ricerca, Esc la svuota o torna al registratore.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.metaKey && event.key === "f") {
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+      if (isCmdOrCtrl && event.key === "f") {
         event.preventDefault();
         setSearchOpen(true);
         searchInput.current?.focus();
         searchInput.current?.select();
-      } else if (event.metaKey && event.key === ",") {
+      } else if (isCmdOrCtrl && event.key === ",") {
         event.preventDefault();
         setShowSettings(true);
-      } else if (event.metaKey && event.key === "n") {
+      } else if (isCmdOrCtrl && event.key === "n") {
         event.preventDefault();
         setShowSettings(false);
         setSelectedId(null);
-      } else if (event.key === "?" && !event.metaKey) {
+      } else if (event.key === "?" && !isCmdOrCtrl) {
         const target = event.target as HTMLElement | null;
         if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
         event.preventDefault();
@@ -328,14 +329,14 @@ export default function App() {
             <div className="brief-no-drag flex items-center gap-1.5">
               <button
                 onClick={() => setSearchOpen((aperto) => !aperto)}
-                title="Cerca (⌘F)"
+                title={`Cerca (${typeof navigator !== "undefined" && navigator.userAgent.includes("Mac") ? "⌘F" : "Ctrl+F"})`}
                 className="brief-button px-2 py-1 text-xs text-ink-muted hover:text-ink"
               >
                 ⌕
               </button>
               <button
                 onClick={() => setShowSettings(true)}
-                title="Impostazioni (⌘,)"
+                title={`Impostazioni (${typeof navigator !== "undefined" && navigator.userAgent.includes("Mac") ? "⌘," : "Ctrl+,"})`}
                 className="brief-button px-2 py-1 text-xs text-ink-muted hover:text-ink"
               >
                 ⚙

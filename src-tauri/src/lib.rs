@@ -3,7 +3,6 @@ mod diarization;
 mod audio;
 #[cfg(windows)]
 mod capture_windows;
-#[cfg(windows)]
 mod wav;
 mod export;
 mod import;
